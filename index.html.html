@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiber Master Pro v29.5 - ARGIS FINAL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --primary: #0f172a; --accent: #4f46e5; --modular: #f39c12; --switch: #10b981; --edfa: #e11d48; --olt: #8b5cf6; --proyectado: #f59e0b; --danado: #475569; }
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #000; }
+        #loginScreen { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; }
+        .login-box { background: white; padding: 25px; border-radius: 12px; color: #334155; width: 85%; max-width: 320px; text-align: center; }
+        .login-box input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .fixed-top-container { flex-shrink: 0; z-index: 100; background: #f1f5f9; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header-top { background: #0f172a; padding: 10px; display: flex; align-items: center; justify-content: space-between; color: white; }
+        .btn-menu-open { background: var(--accent); color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; cursor: pointer; }
+        .btn-save-top { background: var(--edfa); color: white; border: none; padding: 8px 15px; border-radius: 6px; font-weight: 900; font-size: 0.75rem; cursor: pointer; }
+        .search-area { background: #fff; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+        .search-input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; box-sizing: border-box; }
+        .status-pill-container { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .pill { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; background: white; border: 1px solid #e2e8f0; white-space: nowrap; }
+        .scroll-section { flex-grow: 1; overflow: auto; background: #fff; }
+        table { width: 100%; min-width: 1100px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+        th { background: var(--primary); color: white; padding: 8px; text-align: left; font-size: 0.55rem; position: sticky; top: 0; z-index: 10; border-right: 1px solid #334155; }
+        .filter-head th { top: 31px; background: #1e293b; }
+        .filter-select { width: 100%; font-size: 10px; padding: 2px; border: none; background: #334155; color: white; border-radius: 3px; }
+        td { padding: 6px; border-bottom: 1px solid #f1f5f9; font-size: 0.68rem; }
+        .sidebar-left { position: fixed; top: 0; left: -260px; width: 260px; height: 100%; background: #1e293b; transition: 0.3s ease; z-index: 400; padding-top: 20px; }
+        .sidebar-left.active { left: 0; }
+        .side-item { padding: 15px 20px; color: #cbd5e1; cursor: pointer; border-bottom: 1px solid #334155; font-weight: 700; font-size: 0.85rem; }
+        .panel-floating { position: fixed; background: white; transition: 0.3s ease; z-index: 500; padding: 20px; box-shadow: 0 0 25px rgba(0,0,0,0.4); overflow-y: auto; display: none; flex-direction: column; }
+        @media (max-width: 768px) { .panel-floating.active { display: flex; inset: 0; width: 100%; height: 100%; } }
+        @media (min-width: 769px) { .panel-floating.active { display: flex; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; max-height: 90vh; border-radius: 12px; } }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 350; backdrop-filter: blur(2px); }
+        .overlay.active { display: block; }
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-group.full { grid-column: span 2; }
+        label { display: block; font-size: 0.6rem; font-weight: 800; color: #64748b; margin-bottom: 2px; text-transform: uppercase; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; }
+        .status-libre { color: #10b981 !important; font-weight: 900; }
+        .status-proyectado { color: var(--proyectado) !important; font-weight: 900; }
+        .status-ocupado { color: #ef4444 !important; font-weight: 900; }
+        .status-danado { color: var(--danado) !important; font-weight: 900; }
+        .color-tag { display: block; padding: 2px; border-radius: 3px; color: white; text-align: center; font-weight: 800; font-size: 0.6rem; }
+        .buffer-circle { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #000; display: inline-block; margin-right: 5px; }
+        .input-inline { width: 100%; border: none; background: transparent; outline: none; font-size: inherit; }
+        .admin-only { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen">
+    <div class="login-box">
+        <h2 style="margin:0 0 20px 0">ARGIS SYSTEM</h2>
+        <input type="text" id="userInput" placeholder="Usuario">
+        <input type="password" id="passInput" placeholder="Contraseña">
+        <button id="btnLogin" onclick="login()" style="background:var(--accent); color:white; border:none; width:100%; padding:14px; border-radius:6px; cursor:pointer; font-weight:bold;">INGRESAR</button>
+    </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanels()"></div>
+
+<div class="fixed-top-container">
+    <div class="header-top">
+        <button class="btn-menu-open admin-only" onclick="toggleSidebar()">☰ MENÚ</button>
+        <div style="font-weight: 900; font-size: 0.8rem;">FIBER MASTER <span id="userTag" style="font-size:0.55rem; background:var(--accent); padding:2px 4px; border-radius:3px;"></span></div>
+        <div style="display:flex; gap:5px;">
+            <button class="btn-save-top admin-only" id="btnSaveTop" onclick="botonX()">GUARDAR</button>
+            <button onclick="logout()" style="background:#475569; color:white; border:none; padding:8px; border-radius:6px; cursor:pointer; font-size:0.7rem;">SALIR</button>
+        </div>
+    </div>
+    <div class="search-area">
+        <input type="text" id="search" class="search-input" placeholder="🔍 Buscar cliente, puerto, HUB..." onkeyup="renderAll()">
+    </div>
+    <div class="status-pill-container">
+        <div class="pill">TOTAL: <b id="cTotal">0</b></div>
+        <div class="pill" style="border-left: 3px solid #10b981">LIBRE: <b id="cLibre">0</b></div>
+        <div class="pill" style="border-left: 3px solid var(--proyectado)">PROY: <b id="cProy">0</b></div>
+        <div class="pill" style="border-left: 3px solid #ef4444">USO: <b id="cOcupado">0</b></div>
+        <div class="pill" style="border-left: 3px solid var(--danado)">DAÑADO: <b id="cDanado">0</b></div>
+    </div>
+</div>
+
+<nav class="sidebar-left" id="sidebar">
+    <div class="side-item" onclick="openPanel('TR')">🟦 1. TRONCALES</div>
+    <div class="side-item" onclick="openPanel('MOD')">🟧 2. PORTAMODULARES</div>
+    <div class="side-item" onclick="openPanel('SW')">🟩 3. SWITCHES</div>
+    <div class="side-item" onclick="openPanel('EDFA')">🟥 4. EDFA WDM</div>
+    <div class="side-item" onclick="openPanel('OLT')">🟪 5. OLT</div>
+    <div class="side-item admin-only" onclick="openPanel('USERS')" style="margin-top:20px; border-top:1px solid #475569; color:#fbbf24;">👥 USUARIOS / PERMISOS</div>
+    <div class="side-item admin-only" onclick="openPanel('FILES')">📁 ARCHIVOS / RESET</div>
+</nav>
+
+<aside class="panel-floating" id="panelFields">
+    <div style="border-bottom: 2px solid #f1f5f9; padding-bottom:15px; margin-bottom:15px; font-weight:900; display:flex; justify-content:space-between; align-items:center;">
+        <span id="panelTitle">-</span> <span onclick="closePanels()" style="cursor:pointer; font-size:2rem;">&times;</span>
+    </div>
+    <div id="panelContent"></div>
+    <button id="btnAction" style="width:100%; padding:15px; border:none; border-radius:6px; color:white; font-weight:800; cursor:pointer; margin-top:15px;">EJECUTAR</button>
+</aside>
+
+<main class="scroll-section">
+    <table>
+        <thead>
+            <tr>
+                <th style="width:110px">HUB</th><th style="width:55px">REF</th><th style="width:45px">CAP</th><th style="width:95px">BUFFER/SLOT</th><th style="width:180px">ALIM</th><th style="width:95px">PUERTO</th><th style="width:230px">CLIENTE</th><th style="width:70px">dBm</th><th style="width:85px">ESTADO</th><th style="width:45px">KM</th><th class="admin-only" style="width:35px">-</th>
+            </tr>
+            <tr class="filter-head" id="filterRow"></tr>
+        </thead>
+        <tbody id="dataTable"></tbody>
+    </table>
+</main>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbycors-FiK5209PQTKLskQUgDLmU45RnVfs3wFFo0_M07ewY4PiVcs1RbM0Kxwk9ShA/exec";
+
+    let usersDB = JSON.parse(localStorage.getItem('argis_users')) || { "admin": { pass: "admin123", role: "ADMIN" } };
+    let currentUser = null;
+    let db = JSON.parse(localStorage.getItem('fiber_v29_final_base')) || [];
+
+    const colors = [{n:"Azul",b:"#0000FF"},{n:"Naranja",b:"#FF8C00"},{n:"Verde",b:"#008000"},{n:"Marrón",b:"#8B4513"},{n:"Gris",b:"#808080"},{n:"Blanco",b:"#FFFFFF",c:"#000"},{n:"Rojo",b:"#FF0000"},{n:"Negro",b:"#000000"},{n:"Amarillo",b:"#FFFF00",c:"#000"},{n:"Violeta",b:"#EE82EE",c:"#000"},{n:"Rosa",b:"#FFC0CB",c:"#000"},{n:"Aqua",b:"#00FFFF",c:"#000"}];
+
+    async function login() {
+        const uInput = document.getElementById('userInput');
+        const pInput = document.getElementById('passInput');
+        const btn = document.getElementById('btnLogin');
+        const u = uInput.value.toLowerCase();
+        const p = pInput.value;
+
+        if (usersDB[u] && usersDB[u].pass === p) {
+            currentUser = { name: u, ...usersDB[u] };
+            btn.innerText = "CARGANDO DATOS...";
+            btn.disabled = true;
+
+            // CARGAR DATOS AUTOMATICAMENTE DESDE GOOGLE SHEETS AL LOGUEAR
+            try {
+                const response = await fetch(WEB_APP_URL);
+                const dataCloud = await response.json();
+                if (dataCloud && dataCloud.length > 0) {
+                    db = dataCloud;
+                    localStorage.setItem('fiber_v29_final_base', JSON.stringify(db));
+                }
+            } catch (e) {
+                console.log("Iniciando con datos locales o vacío");
+            }
+
+            document.getElementById('loginScreen').style.display = 'none';
+            applyPermissions();
+            initFilterRow(); 
+            renderAll();
+        } else { alert("Usuario o contraseña incorrectos"); }
+    }
+    
+    function logout() { location.reload(); }
+
+    function applyPermissions() {
+        const isAdmin = (currentUser.role === "ADMIN");
+        document.getElementById('userTag').innerText = `${currentUser.name.toUpperCase()}`;
+        document.querySelectorAll('.admin-only').forEach(el => {
+            if(el.tagName === 'TH' || el.tagName === 'TD') el.style.display = isAdmin ? 'table-cell' : 'none';
+            else el.style.display = isAdmin ? 'block' : 'none';
+        });
+    }
+
+    function initFilterRow() {
+        const row = document.getElementById('filterRow');
+        let html = '';
+        for(let i=0; i<10; i++) html += `<th><select class="filter-select" onchange="renderAll()"><option value="">Todo</option></select></th>`;
+        html += `<th class="admin-only"></th>`;
+        row.innerHTML = html;
+    }
+
+    function updateFilters() {
+        const selects = document.querySelectorAll('.filter-select');
+        const keys = ['hub', 'ref', 'capacidad', 'extra', 'alim', 'label', 'cliente', 'potencia', 'estado', 'dist'];
+        keys.forEach((key, index) => {
+            if(!selects[index]) return;
+            const currentVal = selects[index].value;
+            let options = [...new Set(db.map(item => key === 'estado' ? getEstado(item.cliente) : (item[key] || "-")))].sort();
+            let html = '<option value="">Todo</option>';
+            options.forEach(opt => html += `<option value="${opt}" ${String(opt) === currentVal ? 'selected' : ''}>${opt}</option>`);
+            selects[index].innerHTML = html;
+        });
+    }
+
+    function getEstado(c) {
+        let t = (c||"-").toUpperCase().trim();
+        if(t.startsWith("DAÑADO") || t==="MALOGRADO" || t==="FALLO") return "DAÑADO";
+        if(t==="" || t==="-") return "LIBRE";
+        if(t.startsWith("PROYECTADO")) return "PROYECTADO";
+        return "OCUPADO";
+    }
+
+    function renderAll() {
+        const q = document.getElementById('search').value.toLowerCase();
+        const selects = document.querySelectorAll('.filter-select');
+        const tbody = document.getElementById('dataTable'); tbody.innerHTML = "";
+        const isAdmin = (currentUser && currentUser.role === "ADMIN");
+        updateFilters(); 
+        let t=0, l=0, o=0, p=0, d=0;
+        db.forEach(i => {
+            let est = getEstado(i.cliente);
+            const rowVals = [i.hub, i.ref, i.capacidad, i.extra, i.alim, i.label, i.cliente, i.potencia, est, i.dist];
+            const searchMatch = Object.values(i).some(v => String(v).toLowerCase().includes(q));
+            const filterMatch = Array.from(selects).every((sel, idx) => sel.value === "" || String(rowVals[idx]) === sel.value);
+            if (searchMatch && filterMatch) {
+                t++;
+                if(est==="LIBRE") l++; else if(est==="OCUPADO") o++; else if(est==="PROYECTADO") p++; else d++;
+                const row = tbody.insertRow();
+                const ro = isAdmin ? "" : "readonly";
+                let buf = (i.type === 'TR' && i.bufferColor) ? `<div><span class="buffer-circle" style="background:${i.bufferColor}"></span>${i.extra}</div>` : i.extra;
+                row.innerHTML = `
+                    <td><b>${i.hub}</b></td><td>${i.ref}</td><td>${i.capacidad}</td><td>${buf}</td>
+                    <td><input class="input-inline" style="color:blue" value="${i.alim}" ${ro} onchange="edit('${i.id}','alim',this.value)"></td>
+                    <td><span class="color-tag" style="background:${i.colorBg}; color:${i.colorText}">${i.label}</span></td>
+                    <td><input class="input-inline" value="${i.cliente}" ${ro} onchange="edit('${i.id}','cliente',this.value)"></td>
+                    <td><input class="input-inline" style="color:red; font-weight:bold; text-align:center" value="${i.potencia}" ${ro} onchange="edit('${i.id}','potencia',this.value)"></td>
+                    <td class="status-${est.toLowerCase().replace('ñ','n')}">${est}</td>
+                    <td><input class="input-inline" value="${i.dist}" ${ro} onchange="edit('${i.id}','dist',this.value)"></td>
+                    <td class="admin-only"><button onclick="del('${i.id}')" style="color:red; border:none; background:none; cursor:pointer;">✖</button></td>`;
+            }
+        });
+        document.getElementById('cTotal').innerText = t; document.getElementById('cLibre').innerText = l;
+        document.getElementById('cOcupado').innerText = o; document.getElementById('cProy').innerText = p; document.getElementById('cDanado').innerText = d;
+    }
+
+    function openPanel(type) {
+        const content = document.getElementById('panelContent');
+        const btn = document.getElementById('btnAction');
+        const title = document.getElementById('panelTitle');
+        document.getElementById('panelFields').classList.add('active');
+        document.getElementById('overlay').classList.add('active');
+        btn.style.display = 'block';
+
+        if(type === 'TR') {
+            title.innerText = "NUEVA TRONCAL"; btn.style.background = "var(--accent)";
+            content.innerHTML = `<div class="grid-form">
+                <div class="form-group"><label>HUB</label><input id="t1" value="HUB-01"></div>
+                <div class="form-group"><label>ODF / BANDEJA</label><input id="t2" value="ODF-A"></div>
+                <div class="form-group"><label>CABLE / FIBRA</label><input id="t3" value="T-01"></div>
+                <div class="form-group"><label>CAPACIDAD</label><select id="t4" onchange="document.getElementById('t6').value = this.value">
+                    <option value="12">12 FO</option><option value="24" selected>24 FO</option><option value="48">48 FO</option><option value="96">96 FO</option>
+                    <option value="144">144 FO</option><option value="288">288 FO</option><option value="432">432 FO</option>
+                </select></div>
+                <div class="form-group"><label>RANGO INICIO</label><input type="number" id="t5" value="1"></div>
+                <div class="form-group"><label>RANGO FIN</label><input type="number" id="t6" value="24"></div>
+            </div>`;
+            btn.onclick = () => saveTR();
+        } else if(type === 'MOD') {
+            title.innerText = "PORTAMODULAR"; btn.style.background = "var(--modular)";
+            content.innerHTML = `<div class="grid-form">
+                <div class="form-group"><label>HUB</label><input id="m1" value="HUB-01"></div>
+                <div class="form-group"><label>PM</label><input id="m2" value="PM-01"></div>
+                <div class="form-group"><label>SLOT #</label><input id="m3" value="1"></div>
+                <div class="form-group"><label>SPLITTER</label><select id="m4">
+                    <option value="1x2">1x2</option><option value="1x3">1x3</option><option value="1x4">1x4</option>
+                    <option value="1x5">1x5</option><option value="1x8">1x8</option><option value="1x16" selected>1x16</option>
+                </select></div>
+                <div class="form-group"><label>HILO IN (ALIM)</label><input id="m5" value="H-01"></div>
+                <div class="form-group"><label>HILO OUT (PREFIJO)</label><input id="m6" value="S-01"></div>
+            </div>`;
+            btn.onclick = () => saveMOD();
+        } else if(type === 'SW') {
+            title.innerText = "SWITCH"; btn.style.background = "var(--switch)";
+            content.innerHTML = `<div class="grid-form">
+                <div class="form-group"><label>HUB</label><input id="s1" value="HUB-01"></div>
+                <div class="form-group"><label>EQUIPO</label><input id="s2" value="SW-01"></div>
+                <div class="form-group"><label>RACK / POS</label><input id="s3" value="R1"></div>
+                <div class="form-group"><label>PUERTOS LAN</label><input type="number" id="s4" value="24"></div>
+                <div class="form-group"><label>UPLINKS</label><input type="number" id="s5" value="2"></div>
+            </div>`;
+            btn.onclick = () => saveSW();
+        } else if(type === 'EDFA') {
+            title.innerText = "EDFA WDM"; btn.style.background = "var(--edfa)";
+            content.innerHTML = `<div class="grid-form">
+                <div class="form-group"><label>HUB</label><input id="e1" value="HUB-01"></div>
+                <div class="form-group"><label>EQUIPO</label><input id="e2" value="EDFA-01"></div>
+                <div class="form-group"><label>IN OLT</label><input id="e3" value="OLT-01"></div>
+                <div class="form-group"><label>ENTRADA A</label><input id="e4" value="A"></div>
+                <div class="form-group"><label>ENTRADA B</label><input id="e5" value="B"></div>
+                <div class="form-group"><label>WDM OUT</label><input type="number" id="e6" value="32"></div>
+                <div class="form-group full"><label>POTENCIA</label><input id="e7" value="+19 dBm"></div>
+            </div>`;
+            btn.onclick = () => saveEDFA();
+        } else if(type === 'OLT') {
+            title.innerText = "OLT"; btn.style.background = "var(--olt)";
+            content.innerHTML = `<div class="grid-form">
+                <div class="form-group"><label>HUB</label><input id="o1" value="HUB-01"></div>
+                <div class="form-group"><label>OLT</label><input id="o2" value="OLT-01"></div>
+                <div class="form-group"><label>SLOT #</label><input id="o3" value="1"></div>
+                <div class="form-group"><label>TARJETA</label><select id="o4"><option value="8">8 Puertos</option><option value="16" selected>16 Puertos</option></select></div>
+                <div class="form-group full"><label>PREFIJO</label><input id="o5" value="PON"></div>
+            </div>`;
+            btn.onclick = () => saveOLT();
+        } else if(type === 'USERS') {
+            title.innerText = "USUARIOS"; btn.style.display = 'none';
+            renderUsers(content);
+        } else if(type === 'FILES') {
+            title.innerText = "SISTEMA"; btn.style.display = 'none';
+            content.innerHTML = `
+                <button onclick="exportExcel()" style="background:#107c41; color:white; width:100%; padding:15px; border-radius:6px; margin-bottom:10px; border:none; font-weight:bold; cursor:pointer;">📤 EXPORTAR EXCEL</button>
+                <button onclick="exportPDF()" style="background:#e11d48; color:white; width:100%; padding:15px; border-radius:6px; margin-bottom:10px; border:none; font-weight:bold; cursor:pointer;">📄 EXPORTAR PDF</button>
+                <button onclick="document.getElementById('fIn').click()" style="background:#2563eb; color:white; width:100%; padding:15px; border-radius:6px; margin-bottom:10px; border:none; font-weight:bold; cursor:pointer;">📥 IMPORTAR EXCEL</button>
+                <input type="file" id="fIn" style="display:none" onchange="importExcel(event)">
+                <hr><button onclick="clearDB()" style="background:#000; color:white; width:100%; padding:15px; border-radius:6px; border:none; font-weight:bold; cursor:pointer;">⚠️ RESET TOTAL</button>`;
+        }
+    }
+
+    function saveTR() {
+        const h=val('t1'), o=val('t2'), c=val('t3'), cap=val('t4'), ini=parseInt(val('t5')), fin=parseInt(val('t6'));
+        for(let i=ini; i<=fin; i++) {
+            let colH = colors[(i-1)%12], bNum = Math.ceil(i/12), colB = colors[(bNum-1)%12];
+            db.push({ id:'t'+Date.now()+i, hub:h, ref:o, alim:c, capacidad:cap+' FO', label:'Hilo '+i, colorBg:colH.b, colorText:colH.c||"#fff", extra:'Buffer '+bNum, bufferColor: colB.b, cliente:"-", potencia:"-", dist:"0", type:'TR'});
+        } finish();
+    }
+    function saveMOD() {
+        const h=val('m1'), n=val('m2'), s=val('m3'), t=val('m4'), inH=val('m5'), pre=val('m6');
+        const cant = parseInt(t.split('x')[1]);
+        for(let i=1; i<=cant; i++) db.push({ id:'m'+Date.now()+i, hub:h, ref:n, alim:inH, capacidad:t, label:pre+'-'+i, colorBg:'#f39c12', colorText:'#fff', extra:'Slot '+s, cliente:"-", potencia:"-", dist:"0", type:'MOD'});
+        finish();
+    }
+    function saveSW() {
+        const h=val('s1'), n=val('s2'), r=val('s3'), d=parseInt(val('s4')), u=parseInt(val('s5'));
+        for(let i=1; i<=d; i++) db.push({ id:'s'+Date.now()+'d'+i, hub:h, ref:r, alim:n, capacidad:'1G', label:'Port '+i, colorBg:'#10b981', colorText:'#fff', extra:'RJ45', cliente:"-", potencia:"0", dist:"0", type:'SW'});
+        for(let i=1; i<=u; i++) db.push({ id:'s'+Date.now()+'u'+i, hub:h, ref:r, alim:n, capacidad:'10G', label:'UP-'+i, colorBg:'#000', colorText:'#fff', extra:'UPLINK', cliente:"-", potencia:"0", dist:"0", type:'SW'});
+        finish();
+    }
+    function saveEDFA() {
+        for(let i=1; i<=parseInt(val('e6')); i++) db.push({ id:'e'+Date.now()+i, hub:val('e1'), ref:val('e2'), alim:val('e3'), capacidad:val('e7'), label:'WDM-'+i, colorBg:'#e11d48', colorText:'#fff', extra:'A:'+val('e4')+' B:'+val('e5'), cliente:"-", potencia:"-", dist:"0", type:'EDFA'});
+        finish();
+    }
+    function saveOLT() {
+        const q=parseInt(val('o4'));
+        for(let i=1; i<=q; i++) db.push({ id:'olt'+Date.now()+i, hub:val('o1'), ref:val('o2'), alim:'SFP', capacidad:q+'P', label:val('o5')+'-'+i, colorBg:'#8b5cf6', colorText:'#fff', extra:'Slot '+val('o3'), cliente:"-", potencia:"-", dist:"0", type:'OLT'});
+        finish();
+    }
+
+    function renderUsers(container) {
+        let list = '<div style="background:#f8fafc; border:1px solid #e2e8f0; padding:10px; margin-bottom:15px; border-radius:8px; max-height:150px; overflow-y:auto;">';
+        for(let u in usersDB) {
+            list += `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #eee;">
+                <span><b>${u.toUpperCase()}</b> [${usersDB[u].role}]</span>
+                <div>
+                    <button onclick="editUserFields('${u}')" style="background:#3b82f6; color:white; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.65rem;">EDITAR</button>
+                    ${u !== 'admin' ? `<button onclick="delUser('${u}')" style="background:#ef4444; color:white; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.65rem; margin-left:5px;">✖</button>` : ''}
+                </div>
+            </div>`;
+        }
+        list += '</div><div class="grid-form"><div class="form-group full"><label>Usuario</label><input id="nu" placeholder="Nombre"></div><div class="form-group"><label>Clave</label><input id="np" placeholder="Clave"></div><div class="form-group"><label>Modo</label><select id="nr"><option value="READ_ONLY">LECTOR</option><option value="ADMIN">ADMIN</option></select></div><button onclick="addUser()" style="grid-column:span 2; background:green; color:white; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">GUARDAR / ACTUALIZAR</button></div>';
+        container.innerHTML = list;
+    }
+    function editUserFields(u) {
+        document.getElementById('nu').value = u;
+        document.getElementById('np').value = usersDB[u].pass;
+        document.getElementById('nr').value = usersDB[u].role;
+    }
+    function addUser() {
+        const u = val('nu').toLowerCase().trim(), p = val('np'), r = val('nr');
+        if(u && p) { usersDB[u] = { pass: p, role: r }; localStorage.setItem('argis_users', JSON.stringify(usersDB)); openPanel('USERS'); }
+    }
+    function delUser(u) { if(u!=='admin' && confirm('¿Eliminar usuario?')) { delete usersDB[u]; localStorage.setItem('argis_users', JSON.stringify(usersDB)); openPanel('USERS'); } }
+
+    function val(id) { return document.getElementById(id).value; }
+    function finish() { closePanels(); updateDB(); }
+    function edit(id, p, v) { if(currentUser.role==='ADMIN') { let item = db.find(x => x.id === id); if(item) { item[p] = v; updateDB(); } } }
+    function del(id) { if(confirm('¿Eliminar?')) { db = db.filter(x => x.id !== id); updateDB(); } }
+    function updateDB() { localStorage.setItem('fiber_v29_final_base', JSON.stringify(db)); renderAll(); }
+
+    // SINCRONIZACIÓN CON GOOGLE SHEETS
+    async function sincronizarGoogle() {
+        const btn = document.getElementById('btnSaveTop');
+        const textOrig = btn.innerText;
+        btn.innerText = "ENVIANDO..."; btn.disabled = true;
+        try {
+            await fetch(WEB_APP_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(db)
+            });
+            alert("GUARDADO EN LA NUBE");
+        } catch (e) {
+            alert("ERROR AL GUARDAR EN NUBE");
+        } finally {
+            btn.innerText = textOrig; btn.disabled = false;
+        }
+    }
+
+    function botonX() { updateDB(); sincronizarGoogle(); }
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+    function closePanels() { document.querySelectorAll('.active').forEach(e => e.classList.remove('active')); }
+    function exportExcel() { const ws = XLSX.utils.json_to_sheet(db); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Data"); XLSX.writeFile(wb, "Red_Argis.xlsx"); }
+    function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const rows = db.map(i => [i.hub, i.ref, i.capacidad, i.extra, i.alim, i.label, i.cliente, i.potencia, getEstado(i.cliente), i.dist]);
+        doc.autoTable({ head: [['HUB','REF','CAP','BUFFER/SLOT','ALIM','PTO','CLIENTE','dBm','ESTADO','KM']], body: rows, styles: {fontSize:7} });
+        doc.save("Red_Argis.pdf");
+    }
+    function importExcel(e) { const reader = new FileReader(); reader.onload = (ev) => { const workbook = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'}); db = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]); updateDB(); alert("Importado"); }; reader.readAsArrayBuffer(e.target.files[0]); }
+    function clearDB() { if(confirm("¿Borrar todo?")) { db = []; updateDB(); } }
+
+    window.onload = () => { if(!currentUser) document.getElementById('loginScreen').style.display = 'flex'; };
+</script>
+</body>
+</html>

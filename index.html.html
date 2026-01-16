@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiber Master Pro v29.5 - ARGIS FINAL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --primary: #0f172a; --accent: #4f46e5; --modular: #f39c12; --switch: #10b981; --edfa: #e11d48; --olt: #8b5cf6; --proyectado: #f59e0b; --danado: #475569; }
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #000; }
+        
+        /* LOGIN */
+        #loginScreen { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; }
+        .login-box { background: white; padding: 25px; border-radius: 12px; color: #334155; width: 85%; max-width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        
+        /* CABECERA */
+        .fixed-top-container { flex-shrink: 0; z-index: 100; background: #f1f5f9; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header-top { background: #0f172a; padding: 10px; display: flex; align-items: center; justify-content: space-between; color: white; min-height: 50px; }
+        
+        /* BOTONES (INICIALMENTE OCULTOS) */
+        .btn-menu-open { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; cursor: pointer; display: none; }
+        .btn-save-top { background: var(--switch); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: 900; font-size: 0.75rem; cursor: pointer; display: none; }
+        
+        /* TABLA Y CONTENIDO */
+        .scroll-section { flex-grow: 1; overflow: auto; background: #fff; }
+        table { width: 100%; min-width: 1100px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+        th { background: var(--primary); color: white; padding: 8px; text-align: left; font-size: 0.55rem; position: sticky; top: 0; z-index: 10; border-right: 1px solid #334155; }
+        td { padding: 6px; border-bottom: 1px solid #f1f5f9; font-size: 0.68rem; }
+        
+        /* BUSCADOR Y PILLS */
+        .search-area { background: #fff; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+        .search-input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; box-sizing: border-box; }
+        .status-pill-container { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .pill { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; background: white; border: 1px solid #e2e8f0; white-space: nowrap; }
+
+        /* SIDEBAR */
+        .sidebar-left { position: fixed; top: 0; left: -260px; width: 260px; height: 100%; background: #1e293b; transition: 0.3s ease; z-index: 400; padding-top: 20px; }
+        .sidebar-left.active { left: 0; }
+        .side-item { padding: 15px 20px; color: #cbd5e1; cursor: pointer; border-bottom: 1px solid #334155; font-weight: 700; font-size: 0.85rem; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 350; backdrop-filter: blur(2px); }
+        .overlay.active { display: block; }
+        
+        .admin-only { display: none; }
+        .input-inline { width: 100%; border: none; background: transparent; outline: none; font-size: inherit; color: inherit; }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen">
+    <div class="login-box">
+        <h2 style="margin:0 0 20px 0; color:#0f172a">ARGIS SYSTEM</h2>
+        <input type="text" id="userInput" placeholder="Usuario">
+        <input type="password" id="passInput" placeholder="Contraseña">
+        <button id="btnLogin" onclick="login()" style="background:var(--accent); color:white; border:none; width:100%; padding:14px; border-radius:6px; cursor:pointer; font-weight:bold;">INGRESAR</button>
+    </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanels()"></div>
+
+<div class="fixed-top-container">
+    <div class="header-top">
+        <button id="btnMenu" class="btn-menu-open admin-only" onclick="toggleSidebar()">☰ MENÚ</button>
+        <div style="font-weight: 900; font-size: 0.8rem;">FIBER MASTER <span id="userTag" style="font-size:0.55rem; background:var(--accent); padding:2px 4px; border-radius:3px;"></span></div>
+        <div style="display:flex; gap:8px;">
+            <button id="btnSaveTop" class="btn-save-top admin-only" onclick="botonX()">GUARDAR</button>
+            <button onclick="logout()" style="background:#475569; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:0.7rem; font-weight:bold;">SALIR</button>
+        </div>
+    </div>
+    <div class="search-area">
+        <input type="text" id="search" class="search-input" placeholder="🔍 Buscar cliente, puerto, HUB..." onkeyup="renderAll()">
+    </div>
+    <div class="status-pill-container">
+        <div class="pill">TOTAL: <b id="cTotal">0</b></div>
+        <div class="pill" style="border-left: 3px solid #10b981">LIBRE: <b id="cLibre">0</b></div>
+        <div class="pill" style="border-left: 3px solid #ef4444">USO: <b id="cOcupado">0</b></div>
+    </div>
+</div>
+
+<nav class="sidebar-left" id="sidebar">
+    <div class="side-item" onclick="alert('Función de Troncales lista')">🟦 1. TRONCALES</div>
+    <div class="side-item" onclick="alert('Función de Modulares lista')">🟧 2. PORTAMODULARES</div>
+    <div class="side-item" onclick="alert('Función de OLT lista')">🟪 3. OLT</div>
+    <div class="side-item" onclick="alert('Gestión de Usuarios')">👥 USUARIOS</div>
+</nav>
+
+<main class="scroll-section">
+    <table>
+        <thead>
+            <tr>
+                <th style="width:110px">HUB</th><th style="width:70px">REF</th><th style="width:150px">ALIM</th><th style="width:100px">PTO</th><th style="width:250px">CLIENTE</th><th style="width:80px">dBm</th><th class="admin-only" style="width:40px">-</th>
+            </tr>
+        </thead>
+        <tbody id="dataTable"></tbody>
+    </table>
+</main>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxJDXh4ULjO_fCrUZN3G9Fi_OFTqnGVWgC6QOFhbzuRqHe_4w1UhRxLhTlz_zz1bff0/exec";
+
+    // Base de datos inicial
+    let usersDB = { "admin": { pass: "admin123", role: "ADMIN" } };
+    let db = JSON.parse(localStorage.getItem('fiber_data')) || [];
+    let currentUser = null;
+
+    async function login() {
+        const u = document.getElementById('userInput').value.toLowerCase().trim();
+        const p = document.getElementById('passInput').value;
+        const btn = document.getElementById('btnLogin');
+
+        if (usersDB[u] && usersDB[u].pass === p) {
+            currentUser = { name: u, ...usersDB[u] };
+            btn.innerText = "CONECTANDO...";
+            
+            try {
+                const res = await fetch(WEB_APP_URL);
+                const data = await res.json();
+                if (data.red) db = data.red;
+                if (data.usuarios) usersDB = data.usuarios;
+            } catch (e) { console.log("Modo Local"); }
+
+            document.getElementById('loginScreen').style.display = 'none';
+            applyPermissions();
+            renderAll();
+        } else {
+            alert("Contraseña incorrecta");
+        }
+    }
+
+    function applyPermissions() {
+        if (!currentUser) return;
+        const isAdmin = (currentUser.role === "ADMIN");
+        document.getElementById('userTag').innerText = currentUser.name.toUpperCase();
+
+        if (isAdmin) {
+            document.getElementById('btnMenu').style.display = 'block';
+            document.getElementById('btnSaveTop').style.display = 'block';
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = (el.tagName === 'TH' || el.tagName === 'TD') ? 'table-cell' : 'block');
+        }
+    }
+
+    function renderAll() {
+        const tbody = document.getElementById('dataTable');
+        const q = document.getElementById('search').value.toLowerCase();
+        tbody.innerHTML = "";
+        let count = 0;
+
+        db.forEach((i, index) => {
+            if (JSON.stringify(i).toLowerCase().includes(q)) {
+                count++;
+                const row = tbody.insertRow();
+                const isAdmin = currentUser.role === "ADMIN";
+                const ro = isAdmin ? "" : "readonly";
+                
+                row.innerHTML = `
+                    <td>${i.hub}</td>
+                    <td>${i.ref}</td>
+                    <td>${i.alim}</td>
+                    <td>${i.label}</td>
+                    <td><input class="input-inline" value="${i.cliente}" ${ro} onchange="updateVal(${index}, 'cliente', this.value)"></td>
+                    <td><input class="input-inline" value="${i.potencia}" ${ro} onchange="updateVal(${index}, 'potencia', this.value)"></td>
+                    <td class="admin-only">${isAdmin ? '<button onclick="deleteRow('+index+')">✖</button>' : ''}</td>
+                `;
+                if(!isAdmin) row.cells[6].style.display = 'none';
+            }
+        });
+        document.getElementById('cTotal').innerText = count;
+    }
+
+    function updateVal(index, field, val) {
+        db[index][field] = val;
+        localStorage.setItem('fiber_data', JSON.stringify(db));
+    }
+
+    async function botonX() {
+        const btn = document.getElementById('btnSaveTop');
+        btn.innerText = "GUARDANDO...";
+        try {
+            await fetch(WEB_APP_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ red: db, usuarios: usersDB })
+            });
+            alert("✅ SINCRONIZADO");
+        } catch (e) { alert("Error al guardar"); }
+        btn.innerText = "GUARDAR";
+    }
+
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+    function closePanels() { document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); }
+    function logout() { location.reload(); }
+</script>
+</body>
+</html>

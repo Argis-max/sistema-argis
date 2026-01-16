@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiber Master Pro v29.5 - ARGIS FINAL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --primary: #0f172a; --accent: #4f46e5; --modular: #f39c12; --switch: #10b981; --edfa: #e11d48; --olt: #8b5cf6; --proyectado: #f59e0b; --danado: #475569; }
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #000; }
+        
+        #loginScreen { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; }
+        .login-box { background: white; padding: 25px; border-radius: 12px; color: #334155; width: 85%; max-width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        
+        .fixed-top-container { flex-shrink: 0; z-index: 100; background: #f1f5f9; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header-top { background: #0f172a; padding: 10px; display: flex; align-items: center; justify-content: space-between; color: white; min-height: 50px; }
+        
+        /* BOTONES DEL BACKUP2 - Visibilidad forzada por JS */
+        .btn-menu-open { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; cursor: pointer; display: none; }
+        .btn-save-top { background: var(--edfa); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: 900; font-size: 0.75rem; cursor: pointer; display: none; }
+        
+        .search-area { background: #fff; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+        .search-input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; box-sizing: border-box; }
+        
+        .status-pill-container { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .pill { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; background: white; border: 1px solid #e2e8f0; white-space: nowrap; }
+        
+        .scroll-section { flex-grow: 1; overflow: auto; background: #fff; }
+        table { width: 100%; min-width: 1100px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+        th { background: var(--primary); color: white; padding: 8px; text-align: left; font-size: 0.55rem; position: sticky; top: 0; z-index: 10; border-right: 1px solid #334155; }
+        .filter-head th { top: 31px; background: #1e293b; }
+        .filter-select { width: 100%; font-size: 10px; padding: 2px; border: none; background: #334155; color: white; border-radius: 3px; }
+        td { padding: 6px; border-bottom: 1px solid #f1f5f9; font-size: 0.68rem; }
+
+        .sidebar-left { position: fixed; top: 0; left: -260px; width: 260px; height: 100%; background: #1e293b; transition: 0.3s ease; z-index: 400; padding-top: 20px; }
+        .sidebar-left.active { left: 0; }
+        .side-item { padding: 15px 20px; color: #cbd5e1; cursor: pointer; border-bottom: 1px solid #334155; font-weight: 700; font-size: 0.85rem; }
+        
+        .panel-floating { position: fixed; background: white; transition: 0.3s ease; z-index: 500; padding: 20px; box-shadow: 0 0 25px rgba(0,0,0,0.4); overflow-y: auto; display: none; flex-direction: column; }
+        .panel-floating.active { display: flex; }
+        @media (max-width: 768px) { .panel-floating.active { inset: 0; width: 100%; height: 100%; } }
+        @media (min-width: 769px) { .panel-floating.active { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; max-height: 90vh; border-radius: 12px; } }
+        
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 350; backdrop-filter: blur(2px); }
+        .overlay.active { display: block; }
+        
+        .admin-only { display: none; }
+        .color-tag { display: block; padding: 2px; border-radius: 3px; color: white; text-align: center; font-weight: 800; font-size: 0.6rem; }
+        .input-inline { width: 100%; border: none; background: transparent; outline: none; font-size: inherit; color: inherit; }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen">
+    <div class="login-box">
+        <h2 style="margin:0 0 20px 0; color:#0f172a">ARGIS SYSTEM</h2>
+        <input type="text" id="userInput" placeholder="Usuario">
+        <input type="password" id="passInput" placeholder="Contraseña">
+        <button onclick="login()" style="background:var(--accent); color:white; border:none; width:100%; padding:14px; border-radius:6px; cursor:pointer; font-weight:bold;">INGRESAR</button>
+    </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanels()"></div>
+
+<div class="fixed-top-container">
+    <div class="header-top">
+        <button id="btnMenu" class="btn-menu-open admin-only" onclick="toggleSidebar()">☰ MENÚ</button>
+        <div style="font-weight: 900; font-size: 0.8rem;">FIBER MASTER <span id="userTag" style="font-size:0.55rem; background:var(--accent); padding:2px 4px; border-radius:3px;"></span></div>
+        <div style="display:flex; gap:8px;">
+            <button id="btnSaveTop" class="btn-save-top admin-only" onclick="sincronizarGoogle()">GUARDAR</button>
+            <button onclick="location.reload()" style="background:#475569; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:0.7rem; font-weight:bold;">SALIR</button>
+        </div>
+    </div>
+    <div class="search-area">
+        <input type="text" id="search" class="search-input" placeholder="🔍 Buscar cliente, puerto, HUB..." onkeyup="renderAll()">
+    </div>
+    <div class="status-pill-container">
+        <div class="pill">TOTAL: <b id="cTotal">0</b></div>
+        <div class="pill" style="border-left: 3px solid #10b981">LIBRE: <b id="cLibre">0</b></div>
+        <div class="pill" style="border-left: 3px solid #ef4444">USO: <b id="cOcupado">0</b></div>
+    </div>
+</div>
+
+<nav class="sidebar-left" id="sidebar">
+    <div class="side-item" onclick="openPanel('TR')">🟦 1. TRONCALES</div>
+    <div class="side-item" onclick="openPanel('MOD')">🟧 2. PORTAMODULARES</div>
+    <div class="side-item" onclick="openPanel('SW')">🟩 3. SWITCHES</div>
+    <div class="side-item" onclick="openPanel('EDFA')">🟥 4. EDFA WDM</div>
+    <div class="side-item" onclick="openPanel('OLT')">🟪 5. OLT</div>
+    <div class="side-item" onclick="openPanel('USERS')">👥 USUARIOS</div>
+    <div class="side-item" onclick="exportExcel()">📤 EXCEL</div>
+</nav>
+
+<aside class="panel-floating" id="panelFields">
+    <div style="border-bottom: 1px solid #eee; padding-bottom:10px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+        <span id="panelTitle" style="font-weight:900;">-</span> <span onclick="closePanels()" style="cursor:pointer; font-size:1.5rem;">&times;</span>
+    </div>
+    <div id="panelContent"></div>
+    <button id="btnAction" style="width:100%; padding:15px; border:none; border-radius:6px; color:white; font-weight:bold; cursor:pointer; margin-top:15px;">EJECUTAR</button>
+</aside>
+
+<main class="scroll-section">
+    <table>
+        <thead>
+            <tr>
+                <th style="width:110px">HUB</th><th style="width:70px">REF</th><th style="width:60px">CAP</th><th style="width:100px">BUFFER/SLOT</th><th style="width:150px">ALIM</th><th style="width:100px">PTO</th><th style="width:250px">CLIENTE</th><th style="width:80px">dBm</th><th style="width:80px">ESTADO</th><th style="width:50px">KM</th><th class="admin-only" style="width:40px">-</th>
+            </tr>
+            <tr class="filter-head" id="filterRow"></tr>
+        </thead>
+        <tbody id="dataTable"></tbody>
+    </table>
+</main>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxJDXh4ULjO_fCrUZN3G9Fi_OFTqnGVWgC6QOFhbzuRqHe_4w1UhRxLhTlz_zz1bff0/exec";
+    
+    let db = JSON.parse(localStorage.getItem('fiber_argis_db')) || [];
+    let usersDB = { "admin": { pass: "admin123", role: "ADMIN" } };
+    let currentUser = null;
+
+    const colors = [{n:"Azul",b:"#0000FF"},{n:"Naranja",b:"#FF8C00"},{n:"Verde",b:"#008000"},{n:"Marrón",b:"#8B4513"},{n:"Gris",b:"#808080"},{n:"Blanco",b:"#FFFFFF",c:"#000"},{n:"Rojo",b:"#FF0000"},{n:"Negro",b:"#000000"},{n:"Amarillo",b:"#FFFF00",c:"#000"},{n:"Violeta",b:"#EE82EE",c:"#000"},{n:"Rosa",b:"#FFC0CB",c:"#000"},{n:"Aqua",b:"#00FFFF",c:"#000"}];
+
+    async function login() {
+        const u = document.getElementById('userInput').value.toLowerCase().trim();
+        const p = document.getElementById('passInput').value;
+        if (usersDB[u] && usersDB[u].pass === p) {
+            currentUser = { name: u, ...usersDB[u] };
+            try {
+                const res = await fetch(WEB_APP_URL);
+                const data = await res.json();
+                if (data.base) db = data.base;
+                if (data.usuarios) usersDB = data.usuarios;
+            } catch (e) { console.log("Modo Offline"); }
+            document.getElementById('loginScreen').style.display = 'none';
+            applyPermissions();
+            initFilterRow();
+            renderAll();
+        } else { alert("Acceso Incorrecto"); }
+    }
+
+    function applyPermissions() {
+        if (!currentUser) return;
+        const isAdmin = (currentUser.role === "ADMIN");
+        document.getElementById('userTag').innerText = currentUser.name.toUpperCase();
+        
+        if (isAdmin) {
+            document.getElementById('btnMenu').style.display = 'block';
+            document.getElementById('btnSaveTop').style.display = 'block';
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = (el.tagName === 'TH' || el.tagName === 'TD') ? 'table-cell' : 'block';
+            });
+        }
+    }
+
+    function openPanel(type) {
+        const content = document.getElementById('panelContent');
+        const btn = document.getElementById('btnAction');
+        const title = document.getElementById('panelTitle');
+        document.getElementById('panelFields').classList.add('active');
+        document.getElementById('overlay').classList.add('active');
+
+        if(type === 'TR') {
+            title.innerText = "NUEVA TRONCAL";
+            content.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <input id="f1" placeholder="HUB" value="HUB-01">
+                <input id="f2" placeholder="ODF" value="ODF-01">
+                <input id="f3" placeholder="TRAMO" value="T-01">
+                <input id="f4" type="number" placeholder="HILOS" value="24">
+            </div>`;
+            btn.onclick = () => {
+                const c = parseInt(document.getElementById('f4').value);
+                for(let i=1; i<=c; i++) {
+                    const col = colors[(i-1)%12];
+                    db.push({id:Date.now()+i, hub:document.getElementById('f1').value, ref:document.getElementById('f2').value, alim:document.getElementById('f3').value, capacidad:'FO', extra:'Buffer', label:'H-'+i, colorBg:col.b, colorText:col.c||'#fff', cliente:'-', potencia:'-', dist:'0', type:'TR'});
+                }
+                finishAction();
+            };
+        }
+        if(type === 'MOD') {
+            title.innerText = "PORTAMODULAR";
+            content.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <input id="m1" placeholder="HUB" value="HUB-01">
+                <input id="m2" placeholder="PM" value="PM-01">
+                <select id="m3"><option value="8">1x8</option><option value="16" selected>1x16</option></select>
+                <input id="m4" placeholder="SLOT" value="1">
+            </div>`;
+            btn.onclick = () => {
+                const c = parseInt(document.getElementById('m3').value);
+                for(let i=1; i<=c; i++) db.push({id:Date.now()+i, hub:document.getElementById('m1').value, ref:document.getElementById('m2').value, alim:'Splitter', capacidad:'1x'+c, extra:'Slot '+document.getElementById('m4').value, label:'S-'+i, colorBg:'#f39c12', colorText:'#fff', cliente:'-', potencia:'-', dist:'0', type:'MOD'});
+                finishAction();
+            };
+        }
+        if(type === 'SW') {
+            title.innerText = "NUEVO SWITCH";
+            content.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <input id="s1" placeholder="HUB" value="HUB-01">
+                <input id="s2" placeholder="EQUIPO" value="SW-01">
+                <input id="s3" type="number" placeholder="PUERTOS" value="24">
+            </div>`;
+            btn.onclick = () => {
+                for(let i=1; i<=document.getElementById('s3').value; i++) db.push({id:Date.now()+i, hub:document.getElementById('s1').value, ref:'RACK', alim:document.getElementById('s2').value, capacidad:'1G', extra:'RJ45', label:'P-'+i, colorBg:'#10b981', colorText:'#fff', cliente:'-', potencia:'0', dist:'0', type:'SW'});
+                finishAction();
+            };
+        }
+        if(type === 'EDFA') {
+            title.innerText = "EDFA WDM";
+            content.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <input id="e1" placeholder="HUB" value="HUB-01">
+                <input id="e2" placeholder="EDFA" value="EDFA-01">
+                <input id="e3" type="number" placeholder="SALIDAS" value="32">
+            </div>`;
+            btn.onclick = () => {
+                for(let i=1; i<=document.getElementById('e3').value; i++) db.push({id:Date.now()+i, hub:document.getElementById('e1').value, ref:document.getElementById('e2').value, alim:'OLT', capacidad:'WDM', extra:'OUT', label:'W-'+i, colorBg:'#e11d48', colorText:'#fff', cliente:'-', potencia:'+19', dist:'0', type:'EDFA'});
+                finishAction();
+            };
+        }
+        if(type === 'OLT') {
+            title.innerText = "NUEVA OLT";
+            content.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <input id="o1" placeholder="HUB" value="HUB-01">
+                <input id="o2" placeholder="OLT" value="OLT-01">
+                <input id="o3" type="number" placeholder="PON" value="16">
+            </div>`;
+            btn.onclick = () => {
+                for(let i=1; i<=document.getElementById('o3').value; i++) db.push({id:Date.now()+i, hub:document.getElementById('o1').value, ref:document.getElementById('o2').value, alim:'SFP', capacidad:'PON', extra:'Slot 1', label:'PON-'+i, colorBg:'#8b5cf6', colorText:'#fff', cliente:'-', potencia:'+4', dist:'0', type:'OLT'});
+                finishAction();
+            };
+        }
+    }
+
+    function renderAll() {
+        const tbody = document.getElementById('dataTable');
+        tbody.innerHTML = "";
+        let cT=0, cL=0, cO=0;
+        db.forEach((i, idx) => {
+            const row = tbody.insertRow();
+            const isAdmin = currentUser.role === "ADMIN";
+            const est = (i.cliente === '-' || !i.cliente) ? 'LIBRE' : 'OCUPADO';
+            cT++; if(est==='LIBRE') cL++; else cO++;
+            
+            row.innerHTML = `<td><b>${i.hub}</b></td><td>${i.ref}</td><td>${i.capacidad}</td><td>${i.extra}</td><td>${i.alim}</td>
+            <td><span class="color-tag" style="background:${i.colorBg||'#4f46e5'}">${i.label}</span></td>
+            <td><input class="input-inline" value="${i.cliente}" ${isAdmin?'':'readonly'} onchange="db[${idx}].cliente=this.value"></td>
+            <td><input class="input-inline" style="color:red; font-weight:bold" value="${i.potencia}" ${isAdmin?'':'readonly'} onchange="db[${idx}].potencia=this.value"></td>
+            <td style="font-weight:900; color:${est==='LIBRE'?'green':'red'}">${est}</td><td>${i.dist}</td>
+            <td class="admin-only"><button onclick="db.splice(${idx},1);renderAll()" style="color:red; border:none; background:none; cursor:pointer">✖</button></td>`;
+        });
+        document.getElementById('cTotal').innerText = cT;
+        document.getElementById('cLibre').innerText = cL;
+        document.getElementById('cOcupado').innerText = cO;
+    }
+
+    function finishAction() { localStorage.setItem('fiber_argis_db', JSON.stringify(db)); closePanels(); renderAll(); }
+    function closePanels() { 
+        document.getElementById('sidebar').classList.remove('active'); 
+        document.getElementById('overlay').classList.remove('active');
+        document.getElementById('panelFields').classList.remove('active');
+    }
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+    
+    async function sincronizarGoogle() {
+        const btn = document.getElementById('btnSaveTop');
+        btn.innerText = "ENVIANDO...";
+        await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ red: db, usuarios: usersDB }) });
+        alert("Sincronizado con éxito");
+        btn.innerText = "GUARDAR";
+    }
+
+    function initFilterRow() {
+        const row = document.getElementById('filterRow');
+        let html = '';
+        for(let i=0; i<10; i++) html += `<th><select class="filter-select" onchange="renderAll()"><option value="">Todo</option></select></th>`;
+        html += `<th class="admin-only"></th>`;
+        row.innerHTML = html;
+    }
+
+    function exportExcel() {
+        const ws = XLSX.utils.json_to_sheet(db);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Red");
+        XLSX.writeFile(wb, "Inventario_Fibra.xlsx");
+    }
+</script>
+</body>
+</html>

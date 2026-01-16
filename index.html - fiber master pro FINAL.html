@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiber Master Pro v29.5 - ARGIS FINAL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --primary: #0f172a; --accent: #4f46e5; --modular: #f39c12; --switch: #10b981; --edfa: #e11d48; --olt: #8b5cf6; --proyectado: #f59e0b; --danado: #475569; }
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #000; }
+        
+        /* Login */
+        #loginScreen { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; }
+        .login-box { background: white; padding: 25px; border-radius: 12px; color: #334155; width: 85%; max-width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        
+        /* Header y Filtros */
+        .fixed-top-container { flex-shrink: 0; z-index: 100; background: #f1f5f9; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header-top { background: #0f172a; padding: 10px; display: flex; align-items: center; justify-content: space-between; color: white; min-height: 50px; }
+        .btn-menu-open, .btn-save-top { padding: 10px 15px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; border: none; cursor: pointer; display: none; }
+        .btn-menu-open { background: var(--accent); color: white; }
+        .btn-save-top { background: var(--edfa); color: white; }
+        
+        .search-area { background: #fff; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 10px; align-items: center; }
+        .search-input { flex-grow: 1; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; }
+        
+        .status-pill-container { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .pill { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; background: white; border: 1px solid #e2e8f0; white-space: nowrap; }
+        
+        /* TABLA CORREGIDA - ANCHOS FIJOS */
+        .scroll-section { flex-grow: 1; overflow: auto; background: #fff; }
+        table { width: 1100px; border-collapse: separate; border-spacing: 0; table-layout: fixed; } /* Ancho fijo total para evitar saltos */
+        
+        th, td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px; border-bottom: 1px solid #f1f5f9; }
+        th { background: var(--primary); color: white; text-align: left; font-size: 0.55rem; position: sticky; top: 0; z-index: 10; border-right: 1px solid #334155; }
+        
+        /* Definición estricta de columnas */
+        .col-hub { width: 110px; }
+        .col-ref { width: 70px; }
+        .col-cap { width: 60px; }
+        .col-slot { width: 100px; }
+        .col-alim { width: 150px; }
+        .col-pto { width: 100px; }
+        .col-cliente { width: 250px; }
+        .col-dbm { width: 80px; }
+        .col-est { width: 80px; }
+        .col-km { width: 50px; }
+        .col-adm { width: 40px; }
+
+        .th-content { display: flex; align-items: center; justify-content: space-between; }
+        .filter-menu { position: absolute; background: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000; padding: 10px; min-width: 150px; display: none; }
+
+        /* Estilos de Celda */
+        .color-tag { display: block; padding: 4px; border-radius: 4px; text-align: center; font-weight: 900; font-size: 0.65rem; border: 1px solid rgba(0,0,0,0.1); }
+        .input-inline { width: 100%; border: none; background: transparent; outline: none; font-size: 0.68rem; }
+        .admin-only { display: none; }
+
+        /* Paneles */
+        .sidebar-left { position: fixed; top: 0; left: -260px; width: 260px; height: 100%; background: #1e293b; transition: 0.3s ease; z-index: 400; padding-top: 20px; }
+        .sidebar-left.active { left: 0; }
+        .side-item { padding: 15px 20px; color: #cbd5e1; cursor: pointer; border-bottom: 1px solid #334155; font-weight: 700; }
+        .panel-floating { position: fixed; background: white; z-index: 500; padding: 20px; border-radius: 12px; display: none; flex-direction: column; width: 95%; max-width: 450px; max-height: 85vh; overflow-y: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .panel-floating.active { display: flex; }
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 350; backdrop-filter: blur(2px); }
+        .overlay.active { display: block; }
+        
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-group { display: flex; flex-direction: column; margin-bottom: 10px; }
+        label { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    </style>
+</head>
+<body onclick="closeFilters()">
+
+<div id="loginScreen">
+    <div class="login-box">
+        <h2 style="margin:0 0 20px 0; color:#0f172a">ARGIS SYSTEM</h2>
+        <input type="text" id="userInput" placeholder="Usuario">
+        <input type="password" id="passInput" placeholder="Contraseña">
+        <button onclick="login()" style="background:var(--accent); color:white; border:none; width:100%; padding:14px; border-radius:6px; cursor:pointer; font-weight:bold;">INGRESAR</button>
+        <div id="loginMsg" style="display:none; margin-top:10px; color:var(--accent); font-weight:bold;">Cargando base de datos...</div>
+    </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanels()"></div>
+
+<div class="fixed-top-container">
+    <div class="header-top">
+        <button id="btnMenu" class="btn-menu-open admin-only" onclick="toggleSidebar()">☰ MENÚ</button>
+        <div style="font-weight: 900; font-size: 0.8rem;">FIBER MASTER <span id="userTag" style="font-size:0.55rem; background:var(--accent); padding:2px 4px; border-radius:3px;"></span></div>
+        <div style="display:flex; gap:8px;">
+            <button id="btnSaveTop" class="btn-save-top admin-only" onclick="sincronizarGoogle()">GUARDAR</button>
+            <button onclick="location.reload()" style="background:#475569; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:0.7rem; font-weight:bold;">SALIR</button>
+        </div>
+    </div>
+    <div class="search-area">
+        <input type="text" id="search" class="search-input" placeholder="🔍 Buscar..." onkeyup="renderAll()">
+        <button onclick="resetFilters()" style="background:#cbd5e1; border:none; padding:10px; border-radius:6px; font-size:0.7rem; cursor:pointer;">Reset</button>
+    </div>
+    <div class="status-pill-container">
+        <div class="pill">TOTAL: <b id="cTotal">0</b></div>
+        <div class="pill" style="border-left: 3px solid #10b981">LIBRE: <b id="cLibre">0</b></div>
+        <div class="pill" style="border-left: 3px solid #ef4444">USO: <b id="cOcupado">0</b></div>
+        <div class="pill" style="border-left: 3px solid var(--proyectado)">PROY: <b id="cProy">0</b></div>
+        <div class="pill" style="border-left: 3px solid var(--danado)">FALLO: <b id="cDanado">0</b></div>
+    </div>
+</div>
+
+<nav class="sidebar-left" id="sidebar">
+    <div class="side-item" onclick="openPanel('TR')">🟦 1. TRONCALES</div>
+    <div class="side-item" onclick="openPanel('MOD')">🟧 2. PORTAMODULARES</div>
+    <div class="side-item" onclick="openPanel('SW')">🟩 3. SWITCHES</div>
+    <div class="side-item" onclick="openPanel('EDFA')">🟥 4. EDFA WDM</div>
+    <div class="side-item" onclick="openPanel('OLT')">🟪 5. OLT</div>
+    <div class="side-item admin-only" onclick="openPanel('USERS')" style="color:#fbbf24; border-top:1px solid #475569;">👥 USUARIOS</div>
+    <div class="side-item admin-only" onclick="openPanel('FILES')">📁 EXPORTAR</div>
+</nav>
+
+<aside class="panel-floating" id="panelFields">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <span id="panelTitle" style="font-weight:900;"></span> <span onclick="closePanels()" style="cursor:pointer; font-size:1.5rem;">&times;</span>
+    </div>
+    <div id="panelContent"></div>
+    <button id="btnAction" style="width:100%; padding:15px; border:none; border-radius:8px; color:white; font-weight:bold; cursor:pointer; margin-top:15px;">EJECUTAR</button>
+</aside>
+
+<main class="scroll-section">
+    <table>
+        <thead>
+            <tr>
+                <th class="col-hub"><div class="th-content">HUB <span onclick="toggleFilter(event, 'hub')">▼</span></div><div id="filter-hub" class="filter-menu"></div></th>
+                <th class="col-ref"><div class="th-content">REF <span onclick="toggleFilter(event, 'ref')">▼</span></div><div id="filter-ref" class="filter-menu"></div></th>
+                <th class="col-cap"><div class="th-content">CAP <span onclick="toggleFilter(event, 'capacidad')">▼</span></div><div id="filter-capacidad" class="filter-menu"></div></th>
+                <th class="col-slot">BUFFER/SLOT</th>
+                <th class="col-alim"><div class="th-content">ALIM <span onclick="toggleFilter(event, 'alim')">▼</span></div><div id="filter-alim" class="filter-menu"></div></th>
+                <th class="col-pto"><div class="th-content">PTO <span onclick="toggleFilter(event, 'label')">▼</span></div><div id="filter-label" class="filter-menu"></div></th>
+                <th class="col-cliente"><div class="th-content">CLIENTE <span onclick="toggleFilter(event, 'cliente')">▼</span></div><div id="filter-cliente" class="filter-menu"></div></th>
+                <th class="col-dbm">dBm</th>
+                <th class="col-est"><div class="th-content">ESTADO <span onclick="toggleFilter(event, 'estado')">▼</span></div><div id="filter-estado" class="filter-menu"></div></th>
+                <th class="col-km">KM</th>
+                <th class="col-adm admin-only">-</th>
+            </tr>
+        </thead>
+        <tbody id="dataTable"></tbody>
+    </table>
+</main>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx0VwQndzCCWwJpaE9ARqVZf05SB3L5_Ut-_xcNmW7J-lGN4G5p7YiwgcKpWfttrQA1/exec";
+    let db = [];
+    let usersDB = { "admin": { pass: "admin123", role: "ADMIN" } };
+    let currentUser = null;
+    let activeFilters = {}; 
+
+    const colors = [
+        {n:"Azul",b:"#0000FF",c:"#fff"}, {n:"Naranja",b:"#FF8C00",c:"#fff"}, {n:"Verde",b:"#008000",c:"#fff"},
+        {n:"Marrón",b:"#8B4513",c:"#fff"}, {n:"Gris",b:"#808080",c:"#fff"}, {n:"Blanco",b:"#FFFFFF",c:"#000"},
+        {n:"Rojo",b:"#FF0000",c:"#fff"}, {n:"Negro",b:"#000000",c:"#fff"}, {n:"Amarillo",b:"#FFFF00",c:"#000"},
+        {n:"Violeta",b:"#EE82EE",c:"#000"}, {n:"Rosa",b:"#FFC0CB",c:"#000"}, {n:"Aqua",b:"#00FFFF",c:"#000"}
+    ];
+
+    async function login() {
+        const u = document.getElementById('userInput').value.toLowerCase().trim();
+        const p = document.getElementById('passInput').value;
+        if (usersDB[u] && usersDB[u].pass === p) {
+            currentUser = { name: u, ...usersDB[u] };
+            document.getElementById('loginMsg').style.display = 'block';
+            try {
+                const res = await fetch(WEB_APP_URL);
+                const data = await res.json();
+                if (data.base) db = data.base;
+                if (data.usuarios) usersDB = data.usuarios;
+            } catch (e) { console.warn("Modo Offline"); }
+            document.getElementById('loginScreen').style.display = 'none';
+            applyPermissions(); renderAll();
+        } else { alert("Error de acceso"); }
+    }
+
+    function applyPermissions() {
+        if (!currentUser) return;
+        const isAdmin = (currentUser.role === "ADMIN");
+        document.getElementById('userTag').innerText = currentUser.name.toUpperCase();
+        if (isAdmin) {
+            document.getElementById('btnMenu').style.display = 'block';
+            document.getElementById('btnSaveTop').style.display = 'block';
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'table-cell');
+        }
+    }
+
+    function toggleFilter(event, key) {
+        event.stopPropagation();
+        const menu = document.getElementById(`filter-${key}`);
+        if (menu.style.display === 'block') { menu.style.display = 'none'; return; }
+        closeFilters();
+        let values = (key === 'estado') ? ["LIBRE", "USO", "PROY", "FALLO"] : [...new Set(db.map(i => i[key]))].filter(v => v).sort();
+        menu.innerHTML = `<div style="cursor:pointer;padding:5px;" onclick="applyFilter('${key}', null)"><b>(Todos)</b></div>` + 
+            values.map(v => `<div style="cursor:pointer;padding:5px;font-size:0.7rem;" onclick="applyFilter('${key}', '${v}')">${v}</div>`).join('');
+        menu.style.display = 'block';
+    }
+
+    function applyFilter(k, v) { if(!v) delete activeFilters[k]; else activeFilters[k] = v; renderAll(); }
+    function closeFilters() { document.querySelectorAll('.filter-menu').forEach(m => m.style.display = 'none'); }
+    function resetFilters() { activeFilters = {}; document.getElementById('search').value=""; renderAll(); }
+
+    function renderAll() {
+        const tbody = document.getElementById('dataTable'); tbody.innerHTML = "";
+        const q = document.getElementById('search').value.toLowerCase();
+        let t=0, l=0, o=0, p=0, d=0;
+
+        db.forEach((i, idx) => {
+            let est = "LIBRE"; 
+            let cName = (i.cliente||"-").toUpperCase();
+            if(cName.startsWith("PROY")) est="PROY";
+            else if(cName.startsWith("DAÑ") || cName.startsWith("FALL")) est="FALLO";
+            else if(cName === "-" || cName === "") est="LIBRE";
+            else est="USO";
+
+            const matchSearch = Object.values(i).some(v => String(v).toLowerCase().includes(q));
+            let matchCol = true;
+            for(let k in activeFilters) { if(k==='estado'?est!==activeFilters[k]:i[k]!==activeFilters[k]) matchCol=false; }
+
+            if(!matchSearch || !matchCol) return;
+
+            t++; if(est==="PROY") p++; else if(est==="FALLO") d++; else if(est==="LIBRE") l++; else o++;
+
+            const row = tbody.insertRow();
+            const isAdmin = currentUser.role === 'ADMIN';
+            
+            // FILA CON CLASES DE ANCHO FIJO
+            row.innerHTML = `
+                <td class="col-hub"><b>${i.hub}</b></td>
+                <td class="col-ref">${i.ref}</td>
+                <td class="col-cap">${i.capacidad||'FO'}</td>
+                <td class="col-slot">${i.extra||'-'}</td>
+                <td class="col-alim">${i.alim}</td>
+                <td class="col-pto"><span class="color-tag" style="background:${i.colorBg}; color:${i.colorBg==='#FFFFFF'?'#000':'#fff'}">${i.label}</span></td>
+                <td class="col-cliente"><input class="input-inline" value="${i.cliente}" ${isAdmin?'':'readonly'} onchange="db[${idx}].cliente=this.value;renderAll()"></td>
+                <td class="col-dbm"><input class="input-inline" value="${i.potencia||'-'}" ${isAdmin?'':'readonly'} onchange="db[${idx}].potencia=this.value"></td>
+                <td class="col-est" style="font-weight:900; color:${est==='LIBRE'?'#10b981':est==='USO'?'#ef4444':est==='PROY'?'#f59e0b':'#475569'}">${est}</td>
+                <td class="col-km"><input class="input-inline" value="${i.dist||'0'}" ${isAdmin?'':'readonly'} onchange="db[${idx}].dist=this.value"></td>
+                <td class="col-adm admin-only" style="display:${isAdmin?'table-cell':'none'}"><button onclick="db.splice(${idx},1);renderAll()" style="color:red;border:none;background:none;cursor:pointer;">✖</button></td>
+            `;
+        });
+        document.getElementById('cTotal').innerText = t;
+        document.getElementById('cLibre').innerText = l;
+        document.getElementById('cOcupado').innerText = o;
+        document.getElementById('cProy').innerText = p;
+        document.getElementById('cDanado').innerText = d;
+    }
+
+    // Funciones de Usuarios Corregidas
+    function renderUsers() {
+        const content = document.getElementById('panelContent');
+        content.innerHTML = `
+            <div style="max-height:150px; overflow-y:auto; margin-bottom:10px; border:1px solid #eee;">
+                ${Object.keys(usersDB).map(u => `<div style="display:flex; justify-content:space-between; padding:5px; font-size:0.8rem;"><span>${u} (${usersDB[u].role})</span> <button onclick="delete usersDB['${u}']; renderUsers()" style="color:red;">X</button></div>`).join('')}
+            </div>
+            <div class="grid-form">
+                <input id="nu" placeholder="Usuario"> <input id="np" type="password" placeholder="Clave">
+                <select id="nr"><option value="ADMIN">ADMIN</option><option value="LECTOR">LECTOR</option></select>
+                <button onclick="usersDB[document.getElementById('nu').value.toLowerCase()]={pass:document.getElementById('np').value, role:document.getElementById('nr').value}; renderUsers()" style="background:var(--accent); color:white; border:none; padding:10px;">Añadir</button>
+            </div>`;
+    }
+
+    async function sincronizarGoogle() {
+        const btn = document.getElementById('btnSaveTop'); btn.innerText = "...";
+        try { await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ red: db, usuarios: usersDB }) }); alert("Sincronizado"); } 
+        catch(e) { alert("Error"); }
+        btn.innerText = "GUARDAR";
+    }
+
+    function openPanel(type) {
+        const content = document.getElementById('panelContent');
+        const title = document.getElementById('panelTitle');
+        const btn = document.getElementById('btnAction');
+        document.getElementById('panelFields').classList.add('active');
+        document.getElementById('overlay').classList.add('active');
+        btn.style.display = 'block';
+        if(type==='USERS') { title.innerText="👥 USUARIOS"; btn.style.display='none'; renderUsers(); }
+        else if(type==='TR') {
+            title.innerText="🟦 TRONCAL"; btn.style.background="var(--primary)";
+            content.innerHTML=`<div class="grid-form"><div class="form-group"><label>HUB</label><input id="f1" value="HUB-01"></div><div class="form-group"><label>HILOS</label><input id="f2" type="number" value="24"></div></div>`;
+            btn.onclick=()=>{
+                const c = parseInt(document.getElementById('f2').value);
+                for(let i=1; i<=c; i++) db.push({hub:document.getElementById('f1').value, ref:'ODF', capacidad:'FO', extra:'Buffer '+Math.ceil(i/12), alim:'CABLE', label:'H-'+i, colorBg:colors[(i-1)%12].b, cliente:'-', potencia:'-', dist:'0'});
+                closePanels(); renderAll();
+            };
+        }
+        else if(type==='FILES') {
+            title.innerText="📁 EXPORTAR"; btn.style.display='none';
+            content.innerHTML=`<button onclick="exportExcel()" style="width:100%;padding:10px;background:green;color:white;border:none;margin-bottom:10px;">EXCEL</button>
+            <button onclick="if(confirm('¿Borrar todo?')){db=[];renderAll()}" style="width:100%;padding:10px;background:black;color:white;border:none;">BORRAR TODO</button>`;
+        }
+    }
+
+    function exportExcel() { const ws=XLSX.utils.json_to_sheet(db); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Red"); XLSX.writeFile(wb, "Red_Fiber.xlsx"); }
+    function closePanels() { document.getElementById('panelFields').classList.remove('active'); document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); }
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+</script>
+</body>
+</html>

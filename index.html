@@ -592,6 +592,9 @@
       <div class="side-item" onclick="openPanel('IOLM')">
         📎 10. SUBIDA MASIVA iOLM
       </div>
+      <div class="side-item admin-only" onclick="openPanel('DUPES')">
+        🧹 11. LIMPIAR DUPLICADOS
+      </div>
       <div
         class="side-item admin-only"
         onclick="openPanel('USERS')"
@@ -1579,12 +1582,12 @@
                             <td><input class="input-inline" value="${i.dist || "0"}" ${isAdmin ? "" : "readonly"} onchange="db[${idx}].dist=this.value;marcarModificado(db[${idx}].id)"></td>
                             <td onclick="event.stopPropagation()">${
                               i.iolm
-                                ? `<a href="${i.iolm}" target="_blank" style="color:#1e40af; font-size:0.72rem; text-decoration:none;">📄 Ver</a>${isAdmin ? `<label style="cursor:pointer; font-size:0.68rem; color:#64748b; margin-left:4px;" title="Reemplazar">🔄<input type="file" accept="application/pdf" style="display:none;" onchange="subirIolmArchivo(${idx}, this)"></label>` : ""}`
+                                ? `<a href="${i.iolm}" target="_blank" style="color:#1e40af; font-size:0.72rem; text-decoration:none;">📄 Ver</a>${isAdmin ? `<label style="cursor:pointer; font-size:0.68rem; color:#64748b; margin-left:4px;" title="Reemplazar">🔄<input type="file" accept="application/pdf" style="display:none;" onchange="subirIolmArchivo(${i.id}, this)"></label> <span onclick="eliminarIolm(${i.id})" style="cursor:pointer; font-size:0.68rem;" title="Eliminar">🗑️</span>` : ""}`
                                 : isAdmin
-                                  ? `<label class="iolm-estado-${idx}" style="cursor:pointer; font-size:0.72rem; color:#7c3aed;">📎 Subir<input type="file" accept="application/pdf" style="display:none;" onchange="subirIolmArchivo(${idx}, this)"></label>`
+                                  ? `<label class="iolm-estado-${idx}" style="cursor:pointer; font-size:0.72rem; color:#7c3aed;">📎 Subir<input type="file" accept="application/pdf" style="display:none;" onchange="subirIolmArchivo(${i.id}, this)"></label>`
                                   : "-"
                             }</td>
-                            <td class="admin-only"><button onclick="db.splice(${idx},1);renderAll()" style="color:red; border:none; background:none; cursor:pointer;">✖</button></td>`;
+                            <td class="admin-only"><button onclick="eliminarPuertoIndividual(${i.id})" style="color:red; border:none; background:none; cursor:pointer;" title="Eliminar este puerto">✖</button></td>`;
         });
 
         document.getElementById("cTotal").innerText = t;
@@ -1593,6 +1596,47 @@
         document.getElementById("cProy").innerText = p;
         document.getElementById("cDanado").innerText = d;
       }
+      // Igual que sincronizarGoogle, pero sin alertas — se usa después de
+      // subir un PDF de iOLM, para que quede guardado al toque sin que el
+      // usuario tenga que acordarse de apretar GUARDAR.
+      async function sincronizarGoogleSilencioso() {
+        const nuevos = db.filter((p) => registrosNuevos.has(p.id));
+        const modificados = db.filter(
+          (p) => registrosModificados.has(p.id) && !registrosNuevos.has(p.id),
+        );
+        const eliminados = [...registrosEliminados];
+
+        if (
+          nuevos.length === 0 &&
+          modificados.length === 0 &&
+          eliminados.length === 0 &&
+          !usuariosModificados
+        ) {
+          return;
+        }
+
+        try {
+          await fetch(WEB_APP_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              modo: "incremental",
+              nuevos: nuevos,
+              modificados: modificados,
+              eliminados: eliminados,
+              usuarios: usersDB,
+            }),
+          });
+          registrosNuevos.clear();
+          registrosModificados.clear();
+          registrosEliminados.clear();
+          usuariosModificados = false;
+        } catch (e) {
+          console.error("Error guardando automáticamente:", e);
+        }
+      }
+
       async function sincronizarGoogle() {
         const btn = document.getElementById("btnSaveTop");
 
@@ -2986,6 +3030,27 @@
       </div>
     </div>
 `;
+        } else if (t === "DUPES") {
+          title.innerText = "🧹 LIMPIAR DUPLICADOS";
+          btn.style.display = "none";
+          if (btnAdd) btnAdd.style.display = "none";
+          content.innerHTML = `
+    <div style="padding: 0 15px;">
+      <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.75rem; color:#991b1b;">
+        Busca puertos repetidos (mismo HUB + EQUIPO + PTO). Para cada grupo, el sistema sugiere cuál conservar (el que tenga más datos), pero puedes cambiar la elección. Al confirmar, se borran los que NO elegiste conservar.
+      </div>
+      <button onclick="buscarDuplicados()" style="width:100%; padding:12px; border:none; border-radius:8px; background:#dc2626; color:white; font-weight:bold; cursor:pointer; margin-bottom:12px;">
+        🔍 BUSCAR DUPLICADOS
+      </button>
+      <div id="dupesResumen" style="font-size:0.8rem; color:#1e293b; margin-bottom:10px; font-weight:bold;"></div>
+      <div id="dupesLista"></div>
+      <div id="dupesConfirmarWrap" style="display:none; margin-top:12px;">
+        <button onclick="confirmarLimpiezaDuplicados()" style="width:100%; padding:14px; border:none; border-radius:8px; background:#991b1b; color:white; font-weight:bold; cursor:pointer;">
+          🗑️ ELIMINAR LOS NO SELECCIONADOS
+        </button>
+      </div>
+    </div>
+`;
         } else if (t === "IOLM") {
           title.innerText = "📎 SUBIDA MASIVA iOLM";
           btn.style.display = "none";
@@ -3720,7 +3785,52 @@
         throw new Error(data && data.error ? data.error : "error desconocido");
       }
 
-      async function subirIolmArchivo(idx, inputEl) {
+      async function eliminarIolm(portId) {
+        const p = db.find((x) => x.id === portId);
+        if (!p || !p.iolm) return;
+        if (
+          !confirm(
+            "¿Eliminar el reporte iOLM de este puerto? Esto borra el archivo de Drive y no se puede deshacer.",
+          )
+        )
+          return;
+
+        // Extraemos el id del archivo desde la URL de Drive
+        // (ej: https://drive.google.com/file/d/AQUI_VA_EL_ID/view)
+        const m = String(p.iolm).match(/\/d\/([a-zA-Z0-9_-]+)/);
+        const fileId = m ? m[1] : null;
+
+        try {
+          if (fileId) {
+            const res = await fetch(WEB_APP_URL, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({
+                modo: "eliminarArchivo",
+                fileId: fileId,
+              }),
+            });
+            const data = await res.json();
+            if (!data || !data.ok) {
+              console.warn(
+                "No se pudo borrar el archivo de Drive:",
+                data && data.error,
+              );
+            }
+          }
+        } catch (err) {
+          console.error("Error eliminando de Drive:", err);
+        }
+
+        // Sin importar si Drive falló o no, quitamos el link del puerto
+        delete p.iolm;
+        delete p.iolmFecha;
+        marcarModificado(p.id);
+        renderAll();
+        await sincronizarGoogleSilencioso();
+      }
+
+      async function subirIolmArchivo(portId, inputEl) {
         const archivo = inputEl.files[0];
         if (!archivo) return;
         if (archivo.type !== "application/pdf") {
@@ -3734,7 +3844,8 @@
         if (etiqueta) etiqueta.firstChild.textContent = "⏳ Subiendo...";
 
         try {
-          const p = db[idx];
+          const p = db.find((x) => x.id === portId);
+          if (!p) throw new Error("No se encontró el puerto (id " + portId + ")");
           const nombreArchivo =
             (p.hub || "HUB") +
             "_" +
@@ -3744,10 +3855,11 @@
             ".pdf";
 
           const url = await subirArchivoADriveGenerico(archivo, nombreArchivo);
-          db[idx].iolm = url;
-          db[idx].iolmFecha = new Date().toLocaleDateString();
-          marcarModificado(db[idx].id);
+          p.iolm = url;
+          p.iolmFecha = new Date().toLocaleDateString();
+          marcarModificado(p.id);
           renderAll();
+          await sincronizarGoogleSilencioso();
         } catch (err) {
           console.error("Error subiendo iOLM:", err);
           alert(
@@ -3756,6 +3868,37 @@
           );
           if (etiqueta) etiqueta.firstChild.textContent = textoOriginal;
         }
+      }
+
+      function eliminarPuertoIndividual(portId) {
+        const idx = db.findIndex((p) => p.id === portId);
+        if (idx === -1) return;
+        const p = db[idx];
+        if (
+          !confirm(
+            '¿Eliminar el puerto "' +
+              (p.label || "") +
+              '" de ' +
+              (p.ref || "") +
+              " (" +
+              (p.hub || "") +
+              ")? Esta acción no se puede deshacer.",
+          )
+        )
+          return;
+
+        db.splice(idx, 1);
+        // Si era un registro recién creado en esta sesión (todavía no
+        // guardado), alcanza con sacarlo del seguimiento de "nuevos" — no
+        // hace falta marcarlo como "eliminado" porque el servidor nunca
+        // llegó a tenerlo.
+        if (registrosNuevos.has(portId)) {
+          registrosNuevos.delete(portId);
+        } else {
+          registrosEliminados.add(portId);
+        }
+        registrosModificados.delete(portId);
+        renderAll();
       }
 
       function editarClienteInline(idx, valor) {
@@ -5397,13 +5540,148 @@
         }
 
         if (boton) boton.disabled = false;
+        if (progresoEl) progresoEl.innerText = "Guardando en la base...";
+        await sincronizarGoogleSilencioso();
         if (progresoEl) progresoEl.innerText = "";
         alert(
           "Listo — " +
             hechos +
-            " archivo(s) subido(s) correctamente" +
+            " archivo(s) subido(s) y guardado(s) correctamente" +
             (errores > 0 ? ", " + errores + " con error." : "."),
         );
+        renderAll();
+      }
+
+      // ==========================================
+      // LIMPIAR DUPLICADOS (mismo HUB + EQUIPO + PTO)
+      // ==========================================
+      let gruposDuplicados = [];
+
+      function puntajeCompletitud(p) {
+        let puntos = 0;
+        if (p.cliente && p.cliente !== "-") puntos += 2;
+        if (p.potencia && p.potencia !== "-") puntos += 1;
+        if (p.dist && p.dist !== "0" && p.dist !== 0) puntos += 1;
+        if (p.iolm) puntos += 2;
+        return puntos;
+      }
+
+      function buscarDuplicados() {
+        const grupos = new Map();
+        db.forEach((p) => {
+          const key =
+            (p.hub || "") +
+            "||" +
+            (p.ref || "") +
+            "||" +
+            (p.extra || "") +
+            "||" +
+            (p.label || "");
+          if (!grupos.has(key)) grupos.set(key, []);
+          grupos.get(key).push(p);
+        });
+
+        gruposDuplicados = [];
+        grupos.forEach((lista, key) => {
+          if (lista.length > 1) {
+            // Sugerimos conservar el de mayor puntaje; si empatan, el de
+            // menor id (probablemente el más antiguo/original).
+            const ordenados = [...lista].sort((a, b) => {
+              const pa = puntajeCompletitud(a);
+              const pb = puntajeCompletitud(b);
+              if (pb !== pa) return pb - pa;
+              return a.id - b.id;
+            });
+            gruposDuplicados.push({
+              key: key,
+              puertos: ordenados,
+              conservarId: ordenados[0].id,
+            });
+          }
+        });
+
+        const resumenEl = document.getElementById("dupesResumen");
+        const listaEl = document.getElementById("dupesLista");
+        const confirmarWrap = document.getElementById("dupesConfirmarWrap");
+
+        if (gruposDuplicados.length === 0) {
+          resumenEl.innerText = "✓ No se encontraron puertos duplicados.";
+          listaEl.innerHTML = "";
+          confirmarWrap.style.display = "none";
+          return;
+        }
+
+        resumenEl.innerText =
+          "Se encontraron " +
+          gruposDuplicados.length +
+          " grupo(s) duplicado(s) (" +
+          gruposDuplicados.reduce((s, g) => s + g.puertos.length, 0) +
+          " puertos en total).";
+
+        let html = "";
+        gruposDuplicados.forEach((g, gi) => {
+          html += `<div style="border:1px solid #fecaca; border-radius:8px; padding:10px; margin-bottom:8px; background:#fff;">
+        <div style="font-size:0.75rem; font-weight:bold; color:#991b1b; margin-bottom:6px;">${g.puertos[0].hub} / ${g.puertos[0].ref} / ${g.puertos[0].extra || "-"} / ${g.puertos[0].label} — ${g.puertos.length} copias</div>`;
+          g.puertos.forEach((p) => {
+            const checked = p.id === g.conservarId ? "checked" : "";
+            html += `
+          <label style="display:flex; align-items:flex-start; gap:8px; padding:6px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:0.72rem;">
+            <input type="radio" name="dupe_${gi}" value="${p.id}" ${checked} onchange="elegirConservarDuplicado(${gi}, ${p.id})" style="margin-top:3px;">
+            <span>
+              <b>id: ${p.id}</b> — CLIENTE: ${p.cliente || "-"}<br>
+              ALIM: ${p.alim || "-"} · POTENCIA: ${p.potencia || "-"} · DIST: ${p.dist || "0"} · iOLM: ${p.iolm ? "sí" : "no"}
+            </span>
+          </label>`;
+          });
+          html += `</div>`;
+        });
+        listaEl.innerHTML = html;
+        confirmarWrap.style.display = "block";
+      }
+
+      function elegirConservarDuplicado(gi, portId) {
+        gruposDuplicados[gi].conservarId = portId;
+      }
+
+      function confirmarLimpiezaDuplicados() {
+        const aEliminar = [];
+        gruposDuplicados.forEach((g) => {
+          g.puertos.forEach((p) => {
+            if (p.id !== g.conservarId) aEliminar.push(p.id);
+          });
+        });
+
+        if (aEliminar.length === 0) return;
+
+        if (
+          !confirm(
+            "Se van a eliminar " +
+              aEliminar.length +
+              " puerto(s) duplicado(s) (se conserva 1 de cada grupo). Esta acción no se puede deshacer. ¿Continuar?",
+          )
+        )
+          return;
+
+        aEliminar.forEach((id) => {
+          const idx = db.findIndex((p) => p.id === id);
+          if (idx === -1) return;
+          db.splice(idx, 1);
+          if (registrosNuevos.has(id)) {
+            registrosNuevos.delete(id);
+          } else {
+            registrosEliminados.add(id);
+          }
+          registrosModificados.delete(id);
+        });
+
+        alert(
+          aEliminar.length +
+            " puerto(s) eliminado(s). Dale clic a GUARDAR para aplicar los cambios en tu Google Sheet.",
+        );
+        gruposDuplicados = [];
+        document.getElementById("dupesResumen").innerText = "";
+        document.getElementById("dupesLista").innerHTML = "";
+        document.getElementById("dupesConfirmarWrap").style.display = "none";
         renderAll();
       }
 

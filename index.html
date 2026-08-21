@@ -256,17 +256,18 @@
         transition: 0.3s ease;
         z-index: 400;
         padding-top: 20px;
+        overflow-y: auto;
       }
       .sidebar-left.active {
         left: 0;
       }
       .side-item {
-        padding: 15px 20px;
+        padding: 12px 20px;
         color: #cbd5e1;
         cursor: pointer;
         border-bottom: 1px solid #334155;
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
       }
 
       .panel-floating {
@@ -832,6 +833,67 @@
         "El archivo JavaScript se cargó correctamente hasta la función login",
       );
 
+      // Actualización automática: cada 2.5 minutos, mientras la app esté
+      // abierta, revisa si hay datos nuevos guardados por OTROS usuarios y
+      // los trae — pero SOLO si no tienes cambios propios sin guardar, para
+      // nunca pisar tu trabajo en curso.
+      let intervaloActualizacion = null;
+      function iniciarActualizacionPeriodica() {
+        if (intervaloActualizacion) return; // ya está corriendo
+        intervaloActualizacion = setInterval(async () => {
+          const hayCambiosPendientes =
+            registrosNuevos.size > 0 ||
+            registrosModificados.size > 0 ||
+            registrosEliminados.size > 0 ||
+            usuariosModificados;
+          if (hayCambiosPendientes) return; // esperamos al siguiente ciclo
+
+          try {
+            const res = await fetch(WEB_APP_URL);
+            const data = await res.json();
+            if (data.base) {
+              db = data.base;
+              const maxId = db.reduce((max, p) => {
+                const n = parseInt(p.id);
+                return !isNaN(n) && n > max ? n : max;
+              }, 0);
+              if (maxId >= __nextId) __nextId = maxId + 1;
+            }
+            if (
+              data.usuarios &&
+              typeof data.usuarios === "object" &&
+              Object.keys(data.usuarios).length > 0
+            ) {
+              usersDB = { ...usersDB, ...data.usuarios };
+            }
+            renderAll();
+            mostrarAvisoActualizacion();
+          } catch (e) {
+            console.warn("No se pudo actualizar automáticamente:", e);
+          }
+        }, 150000); // 2.5 minutos
+      }
+
+      // Aviso pequeño y discreto abajo a la derecha, que aparece unos
+      // segundos y desaparece solo — para que sepas cuándo se trajeron
+      // datos nuevos de otros usuarios, sin interrumpir lo que haces.
+      function mostrarAvisoActualizacion() {
+        let aviso = document.getElementById("avisoActualizacion");
+        if (!aviso) {
+          aviso = document.createElement("div");
+          aviso.id = "avisoActualizacion";
+          aviso.style =
+            "position:fixed; bottom:20px; right:20px; background:#1e293b; color:#fff; padding:10px 16px; border-radius:8px; font-size:0.78rem; font-weight:bold; box-shadow:0 4px 12px rgba(0,0,0,0.25); z-index:9999; opacity:0; transition:opacity 0.4s ease;";
+          document.body.appendChild(aviso);
+        }
+        aviso.innerText = "🔄 Datos actualizados";
+        aviso.style.opacity = "1";
+        clearTimeout(aviso._timeoutId);
+        aviso._timeoutId = setTimeout(() => {
+          aviso.style.opacity = "0";
+        }, 3000);
+      }
+
       async function login() {
         const u = document
           .getElementById("userInput")
@@ -884,6 +946,7 @@
           document.getElementById("loginScreen").style.display = "none";
           applyPermissions();
           renderAll();
+          iniciarActualizacionPeriodica();
         } else {
           msg.style.display = "none";
           btn.disabled = false;
@@ -1115,6 +1178,7 @@
                                           ["EQUIPO", "8. Editar/Eliminar Equipo"],
                                           ["CAD", "9. Plantilla AutoCAD"],
                                           ["IOLM", "10. Subida Masiva iOLM"],
+                                          ["DUPES", "11. Limpiar Duplicados"],
                                           ["USERS", "Usuarios"],
                                           ["FILES", "Exportar/Sistema"],
                                         ]
@@ -1514,9 +1578,26 @@
             return grupoOrdenMap.get(keyA) - grupoOrdenMap.get(keyB);
           }
 
-          // Dentro del mismo HUB+REF, respetamos el orden real de creación
-          // (el id ahora es un contador secuencial, no un valor basado en
-          // tiempo), así los lotes nunca se mezclan aunque compartan nombre.
+          // Dentro del mismo HUB+REF: primero por BUFFER/SLOT (si aplica),
+          // luego por el número real del puerto (H-24, PT-5...) — así el
+          // orden visual siempre respeta la numeración física, sin
+          // importar en qué orden se crearon ni si algún id se tuvo que
+          // reasignar (ej. al reparar duplicados). Si todo empata, se usa
+          // el id como último desempate.
+          const extraA = String(a.extra || "");
+          const extraB = String(b.extra || "");
+          if (extraA !== extraB) {
+            return extraA.localeCompare(extraB, undefined, { numeric: true });
+          }
+
+          const numsA = String(a.label || "").match(/\d+/g);
+          const numsB = String(b.label || "").match(/\d+/g);
+          const numA = numsA ? parseInt(numsA[numsA.length - 1]) : NaN;
+          const numB = numsB ? parseInt(numsB[numsB.length - 1]) : NaN;
+          if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+            return numA - numB;
+          }
+
           return a.id - b.id;
         });
 
@@ -1574,12 +1655,12 @@
                             <td>${i.ref}</td>
                             <td>${i.capacidad || "FO"}</td>
                             <td>${i.extra}</td>
-                            <td>${isAdmin && i.capacidad === "WDM" ? `<input class="input-inline" value="${i.alim}" title="${String(i.alim || "").replace(/"/g, "&quot;")}" onchange="db[${idx}].alim=this.value;marcarModificado(db[${idx}].id);renderAll()" style="color:var(--edfa); font-weight:bold;">` : i.alim}</td>
+                            <td>${isAdmin && i.capacidad === "WDM" ? `<input class="input-inline" value="${i.alim}" title="${String(i.alim || "").replace(/"/g, "&quot;")}" onchange="editarCampoInline(${i.id}, 'alim', this.value)" style="color:var(--edfa); font-weight:bold;">` : i.alim}</td>
                             <td><span class="color-tag" style="background:${i.colorBg}; color:${textColor}">${i.label}</span></td>
-                            <td><input class="input-inline" value="${i.cliente}" title="${String(i.cliente || "").replace(/"/g, "&quot;")}" ${isAdmin ? "" : "readonly"} onclick="event.stopPropagation()" onchange="editarClienteInline(${idx}, this.value)"></td>
-                            <td><input class="input-inline" value="${i.potencia}" ${isAdmin ? "" : "readonly"} onchange="db[${idx}].potencia=this.value;marcarModificado(db[${idx}].id)"></td>
+                            <td><input class="input-inline" value="${i.cliente}" title="${String(i.cliente || "").replace(/"/g, "&quot;")}" ${isAdmin ? "" : "readonly"} onclick="event.stopPropagation()" onchange="editarClienteInline(${i.id}, this.value)"></td>
+                            <td><input class="input-inline" value="${i.potencia}" ${isAdmin ? "" : "readonly"} onchange="editarCampoInline(${i.id}, 'potencia', this.value)"></td>
                             <td style="font-weight:900; color:${est === "LIBRE" ? "#10b981" : est === "USO" ? "#ef4444" : est === "PROY" ? "#f59e0b" : "#475569"}">${est}</td>
-                            <td><input class="input-inline" value="${i.dist || "0"}" ${isAdmin ? "" : "readonly"} onchange="db[${idx}].dist=this.value;marcarModificado(db[${idx}].id)"></td>
+                            <td><input class="input-inline" value="${i.dist || "0"}" ${isAdmin ? "" : "readonly"} onchange="editarCampoInline(${i.id}, 'dist', this.value)"></td>
                             <td onclick="event.stopPropagation()">${
                               i.iolm
                                 ? `<a href="${i.iolm}" target="_blank" style="color:#1e40af; font-size:0.72rem; text-decoration:none;">📄 Ver</a>${isAdmin ? `<label style="cursor:pointer; font-size:0.68rem; color:#64748b; margin-left:4px;" title="Reemplazar">🔄<input type="file" accept="application/pdf" style="display:none;" onchange="subirIolmArchivo(${i.id}, this)"></label> <span onclick="eliminarIolm(${i.id})" style="cursor:pointer; font-size:0.68rem;" title="Eliminar">🗑️</span>` : ""}`
@@ -1599,6 +1680,22 @@
       // Igual que sincronizarGoogle, pero sin alertas — se usa después de
       // subir un PDF de iOLM, para que quede guardado al toque sin que el
       // usuario tenga que acordarse de apretar GUARDAR.
+      // Reemplaza TODA la hoja con el estado actual de la base — esto es
+      // lo único que garantiza limpiar filas viejas huérfanas que el modo
+      // incremental no puede identificar (ej. varias filas que compartían
+      // el mismo id). Se usa puntualmente, no en el guardado normal.
+      async function sincronizacionCompleta() {
+        await fetch(WEB_APP_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            modo: "red",
+            red: db,
+          }),
+        });
+      }
+
       async function sincronizarGoogleSilencioso() {
         const nuevos = db.filter((p) => registrosNuevos.has(p.id));
         const modificados = db.filter(
@@ -2066,6 +2163,7 @@
           "INSTFTTH",
           "EQUIPO",
           "IOLM",
+          "DUPES",
         ];
         if (
           tiposDeEscritura.includes(type) &&
@@ -3901,8 +3999,15 @@
         renderAll();
       }
 
-      function editarClienteInline(idx, valor) {
-        const p = db[idx];
+      function editarCampoInline(portId, campo, valor) {
+        const p = db.find((x) => x.id === portId);
+        if (!p) return;
+        p[campo] = valor;
+        marcarModificado(portId);
+      }
+
+      function editarClienteInline(portId, valor) {
+        const p = db.find((x) => x.id === portId);
         if (!p) return;
         const actual = String(p.cliente || "").trim();
         const nuevo = String(valor || "").trim();
@@ -3922,8 +4027,8 @@
             return;
           }
         }
-        db[idx].cliente = valor;
-        marcarModificado(db[idx].id);
+        p.cliente = valor;
+        marcarModificado(p.id);
         renderAll();
       }
 
@@ -5566,8 +5671,11 @@
         return puntos;
       }
 
+      let gruposIdsDuplicados = [];
+
       function buscarDuplicados() {
         const grupos = new Map();
+        const porId = new Map();
         db.forEach((p) => {
           const key =
             (p.hub || "") +
@@ -5579,6 +5687,18 @@
             (p.label || "");
           if (!grupos.has(key)) grupos.set(key, []);
           grupos.get(key).push(p);
+
+          const idKey = String(p.id);
+          if (!porId.has(idKey)) porId.set(idKey, []);
+          porId.get(idKey).push(p);
+        });
+
+        // Ids repetidos en registros con contenido DISTINTO (no son la
+        // misma fila duplicada — son dos puertos distintos que quedaron
+        // con el mismo id por error, y eso rompe cualquier búsqueda por id)
+        gruposIdsDuplicados = [];
+        porId.forEach((lista) => {
+          if (lista.length > 1) gruposIdsDuplicados.push(lista);
         });
 
         gruposDuplicados = [];
@@ -5604,27 +5724,51 @@
         const listaEl = document.getElementById("dupesLista");
         const confirmarWrap = document.getElementById("dupesConfirmarWrap");
 
+        let resumenHtml = "";
+        let listaHtml = "";
+
+        if (gruposIdsDuplicados.length > 0) {
+          resumenHtml +=
+            "⚠ " +
+            gruposIdsDuplicados.length +
+            " grupo(s) con el MISMO id en registros distintos (esto rompe búsquedas por id).<br>";
+          listaHtml +=
+            '<div style="border:1px solid #fde68a; border-radius:8px; padding:10px; margin-bottom:12px; background:#fffbeb;">' +
+            '<div style="font-size:0.75rem; font-weight:bold; color:#92400e; margin-bottom:8px;">IDs duplicados (contenido distinto)</div>';
+          gruposIdsDuplicados.forEach((lista) => {
+            listaHtml += `<div style="font-size:0.7rem; color:#78350f; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid #fde68a;">
+          <b>id ${lista[0].id}</b> usado en ${lista.length} registros distintos:<br>`;
+            lista.forEach((p) => {
+              listaHtml += `&nbsp;&nbsp;• ${p.hub} / ${p.ref} / ${p.label || "-"} — ${p.cliente || "-"}<br>`;
+            });
+            listaHtml += `</div>`;
+          });
+          listaHtml += `<button onclick="repararIdsDuplicados()" style="width:100%; padding:10px; border:none; border-radius:6px; background:#d97706; color:white; font-weight:bold; cursor:pointer; margin-top:6px; font-size:0.78rem;">
+        🔧 REASIGNAR IDs NUEVOS AUTOMÁTICAMENTE
+      </button></div>`;
+        }
+
         if (gruposDuplicados.length === 0) {
-          resumenEl.innerText = "✓ No se encontraron puertos duplicados.";
-          listaEl.innerHTML = "";
+          resumenHtml += "✓ No se encontraron puertos con contenido duplicado.";
+          document.getElementById("dupesResumen").innerHTML = resumenHtml;
+          document.getElementById("dupesLista").innerHTML = listaHtml;
           confirmarWrap.style.display = "none";
           return;
         }
 
-        resumenEl.innerText =
+        resumenHtml +=
           "Se encontraron " +
           gruposDuplicados.length +
-          " grupo(s) duplicado(s) (" +
+          " grupo(s) de contenido duplicado (" +
           gruposDuplicados.reduce((s, g) => s + g.puertos.length, 0) +
           " puertos en total).";
 
-        let html = "";
         gruposDuplicados.forEach((g, gi) => {
-          html += `<div style="border:1px solid #fecaca; border-radius:8px; padding:10px; margin-bottom:8px; background:#fff;">
+          listaHtml += `<div style="border:1px solid #fecaca; border-radius:8px; padding:10px; margin-bottom:8px; background:#fff;">
         <div style="font-size:0.75rem; font-weight:bold; color:#991b1b; margin-bottom:6px;">${g.puertos[0].hub} / ${g.puertos[0].ref} / ${g.puertos[0].extra || "-"} / ${g.puertos[0].label} — ${g.puertos.length} copias</div>`;
           g.puertos.forEach((p) => {
             const checked = p.id === g.conservarId ? "checked" : "";
-            html += `
+            listaHtml += `
           <label style="display:flex; align-items:flex-start; gap:8px; padding:6px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:0.72rem;">
             <input type="radio" name="dupe_${gi}" value="${p.id}" ${checked} onchange="elegirConservarDuplicado(${gi}, ${p.id})" style="margin-top:3px;">
             <span>
@@ -5633,10 +5777,58 @@
             </span>
           </label>`;
           });
-          html += `</div>`;
+          listaHtml += `</div>`;
         });
-        listaEl.innerHTML = html;
+        document.getElementById("dupesResumen").innerHTML = resumenHtml;
+        document.getElementById("dupesLista").innerHTML = listaHtml;
         confirmarWrap.style.display = "block";
+      }
+
+      async function repararIdsDuplicados() {
+        if (gruposIdsDuplicados.length === 0) return;
+        if (
+          !confirm(
+            "Se le va a asignar un id nuevo a cada copia repetida (se conserva la primera con su id actual). Esto va a REEMPLAZAR TODA la hoja con el estado actual de la app, para garantizar que no queden filas viejas duplicadas sueltas. Puede tardar un poco con muchos datos. ¿Continuar?",
+          )
+        )
+          return;
+
+        let reparados = 0;
+        gruposIdsDuplicados.forEach((lista) => {
+          // Dejamos el primero con su id actual, y reasignamos uno nuevo
+          // y único a los demás.
+          for (let i = 1; i < lista.length; i++) {
+            lista[i].id = nuevoId();
+            reparados++;
+          }
+        });
+
+        const botonReparar = document.querySelector(
+          'button[onclick="repararIdsDuplicados()"]',
+        );
+        if (botonReparar) {
+          botonReparar.disabled = true;
+          botonReparar.innerText = "⏳ Reescribiendo toda la hoja...";
+        }
+
+        try {
+          await sincronizacionCompleta();
+          registrosNuevos.clear();
+          registrosModificados.clear();
+          registrosEliminados.clear();
+          alert(
+            reparados +
+              " registro(s) reparado(s) y guardado(s) — la hoja completa se reescribió sin filas duplicadas. Vuelve a \"Buscar Duplicados\" para revisar si queda algo más.",
+          );
+        } catch (err) {
+          console.error("Error en la sincronización completa:", err);
+          alert(
+            "Los ids se corrigieron en la app, pero hubo un error guardando en el Sheet. Intenta darle GUARDAR manualmente.\n\n" +
+              err.message,
+          );
+        }
+        buscarDuplicados();
+        renderAll();
       }
 
       function elegirConservarDuplicado(gi, portId) {

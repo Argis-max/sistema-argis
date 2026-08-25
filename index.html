@@ -1584,10 +1584,15 @@
           // importar en qué orden se crearon ni si algún id se tuvo que
           // reasignar (ej. al reparar duplicados). Si todo empata, se usa
           // el id como último desempate.
-          const extraA = String(a.extra || "");
-          const extraB = String(b.extra || "");
-          if (extraA !== extraB) {
-            return extraA.localeCompare(extraB, undefined, { numeric: true });
+          //
+          // En Switch/CMC el slot/posición vive en ALIM (extra guarda el
+          // tipo de puerto: RJ45/SFP+), en los demás tipos vive en EXTRA.
+          const esSwitchA = inferirTipoEquipo(a) === "SWITCH";
+          const esSwitchB = inferirTipoEquipo(b) === "SWITCH";
+          const grupoA = esSwitchA ? String(a.alim || "") : String(a.extra || "");
+          const grupoB = esSwitchB ? String(b.alim || "") : String(b.extra || "");
+          if (grupoA !== grupoB) {
+            return grupoA.localeCompare(grupoB, undefined, { numeric: true });
           }
 
           const numsA = String(a.label || "").match(/\d+/g);
@@ -2450,7 +2455,26 @@
               ultimoHubCreado = hub;
               const pos = fila.querySelector(".s-pos").value;
               const eq = fila.querySelector(".s-eq").value;
-              if (!validarNoDuplicado(hub, eq)) return;
+              const yaExisteMismaPos = db.some(
+                (p) =>
+                  String(p.hub || "").toUpperCase().trim() ===
+                    String(hub || "").toUpperCase().trim() &&
+                  String(p.ref || "").toUpperCase().trim() ===
+                    String(eq || "").toUpperCase().trim() &&
+                  String(p.alim || "").toUpperCase().trim() ===
+                    String(pos || "").toUpperCase().trim(),
+              );
+              if (
+                yaExisteMismaPos &&
+                !confirm(
+                  'Ya existe "' +
+                    eq +
+                    '" en la posición "' +
+                    pos +
+                    '" de este HUB. ¿Deseas agregar más puertos ahí de todas formas?',
+                )
+              )
+                return;
 
               for (let i = 1; i <= lan; i++) {
                 db.push({
